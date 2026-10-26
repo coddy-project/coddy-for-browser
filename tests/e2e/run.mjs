@@ -1,6 +1,7 @@
 // The built extension in a real Chromium against a mock of Coddy's listener:
 // connect, open a tab with the site approval, read and act on the page,
-// files both ways, another chat refused, turnEnded, Stop.
+// files both ways, another chat refused, turnEnded, the side panel's chat,
+// Stop.
 //
 //   npm run build
 //   npm i --no-save playwright   # once; or NODE_PATH pointing at one
@@ -38,8 +39,11 @@ const coddy = await startMockCoddy({ key });
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "coddy-for-browser-"));
 const context = await chromium.launchPersistentContext(profile, {
   headless: true,
+  locale: "en-US",
+  // Chromium on Linux takes the language of its own controls from LANG.
+  env: { ...process.env, LANG: "en_US.UTF-8", LANGUAGE: "en" },
   ...(process.env.CODDY_BROWSER_PATH ? { executablePath: process.env.CODDY_BROWSER_PATH } : { channel: "chromium" }),
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--lang=en-US"],
 });
 const errors = [];
 const capture = async (page, name, widths = [1280], { fit = true } = {}) => {
@@ -87,7 +91,7 @@ try {
   // open_tab asks about the site in a window of the extension's own.
   const opening = coddy.command("open_tab", { params: { url: coddy.base + "/fixture" } });
   const approval = await waitFor("the approval window", () =>
-    context.pages().find((p) => p.url().startsWith(origin + "/popup.html?approval")),
+    context.pages().find((p) => p.url().startsWith(origin + "/approval.html")),
   );
   approval.on("pageerror", (e) => errors.push(e.message));
   await approval.getByRole("button", { name: "Always allow" }).waitFor();
@@ -100,7 +104,7 @@ try {
     coddy.state.tabs.find((t) => t.id === opened.tabId && t.sessionId === "sess_e2e"),
   );
   const page = await waitFor("the fixture page", () => context.pages().find((p) => p.url() === coddy.base + "/fixture"));
-  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const tab = { tabId: opened.tabId };
   const snapshot = await coddy.command("snapshot", tab);
@@ -121,7 +125,7 @@ try {
   await page.getByText("hovered").waitFor();
   // The glow and the Stop button are on the page while Coddy works.
   assert.equal(await page.locator("#coddy-for-browser-indicator").count(), 1);
-  await capture(page, "tab-working", [1000], { fit: false });
+  await capture(page, "tab-working", [1280], { fit: false });
 
   const picture = await coddy.command("screenshot", tab);
   assert.match(picture.dataUrl, /^data:image\/png;base64,/);
@@ -150,24 +154,58 @@ try {
   coddy.notify("browser/turnEnded", { sessionId: "sess_e2e" });
   await waitFor("the indicator to go", async () => (await page.locator("#coddy-for-browser-indicator").count()) === 0);
 
-  // The popup shows the chat and the Stop button.
-  const popup = await context.newPage();
-  popup.on("pageerror", (e) => errors.push(e.message));
-  await popup.setViewportSize({ width: 360, height: 520 });
-  await popup.goto(origin + "/popup.html");
-  await popup.getByText("Chats using this browser").waitFor();
-  await capture(popup, "popup-chat", [360]);
+  // The side panel: the person writes from a page of their own, the tab goes
+  // into the chat's group, Coddy asks for a permission there and answers.
+  const mine = await context.newPage();
+  await mine.goto(coddy.base + "/fixture?mine");
+  await mine.bringToFront();
+  const panel = await context.newPage();
+  panel.on("pageerror", (e) => errors.push(e.message));
+  await panel.setViewportSize({ width: 420, height: 720 });
+  await panel.goto(origin + "/panel.html");
+  await panel.getByText("What should Coddy do in this tab?").waitFor();
+  await panel.locator("#tabbar").getByText("Coddy takes this tab when you send").waitFor();
+  await capture(panel, "panel-empty", [420], { fit: false });
+  await panel.locator("#prompt").fill("Read this page");
+  await panel.locator("#prompt").press("Enter");
+  await panel.getByRole("button", { name: "Allow", exact: true }).waitFor();
+  const mineTab = coddy.state.sent.tab.id;
+  assert.equal(coddy.state.sent.text, "Read this page");
+  assert.equal(coddy.state.sent.tab.url, coddy.base + "/fixture?mine");
+  await waitFor("the person's tab in the chat's group", () =>
+    coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === coddy.state.sent.sessionId),
+  );
+  await capture(panel, "panel-permission", [420], { fit: false });
+  await panel.getByRole("button", { name: "Allow", exact: true }).click();
+  await panel.locator(".message.assistant").getByText("Coddy fixture").waitFor();
+  assert.equal(coddy.state.permission, "allow");
+  assert.equal(await panel.locator(".tool[data-status=done]").count(), 1);
+  await panel.locator("#tabbar").getByText("in this chat").waitFor();
+  await capture(panel, "panel-answer", [420], { fit: false });
+  // Take back ungroups the tab; Share puts it in the shared group.
+  await panel.locator("#tabbar").getByRole("button", { name: "Take back" }).click();
+  await waitFor("the tab out of every group", () => !coddy.state.tabs.find((t) => t.id === mineTab));
+  await panel.locator("#tabbar").getByRole("button", { name: "Share" }).click();
+  await waitFor("the tab in the shared group", () => coddy.state.tabs.find((t) => t.id === mineTab && !t.sessionId));
+  await panel.locator("#tabbar").getByText("shared with Coddy").waitFor();
+  // The chat is listed, and opens again with its messages.
+  await panel.getByRole("button", { name: "New chat" }).click();
+  await panel.getByText("What should Coddy do in this tab?").waitFor();
+  await panel.getByRole("button", { name: "Chats" }).click();
+  await panel.getByRole("button", { name: "Read the page" }).click();
+  await panel.locator(".message.user").getByText("Read this page").waitFor();
+  await panel.locator(".message.assistant strong").getByText("Coddy fixture").waitFor();
 
   // release hands the tab back to the shared group; Stop withdraws everything.
   assert.deepEqual(await coddy.command("release", {}), { released: 1 });
-  await waitFor("the tab in the shared group", () => coddy.state.tabs.find((t) => t.id === opened.tabId && !t.sessionId));
-  await popup.getByRole("button", { name: "Stop Coddy" }).click();
+  await waitFor("the opened tab in the shared group", () => coddy.state.tabs.find((t) => t.id === opened.tabId && !t.sessionId));
+  await panel.getByRole("button", { name: "Stop Coddy" }).click();
   await waitFor("browser/stop", () => coddy.state.stops === 1);
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
   await assert.rejects(coddy.command("snapshot", tab), (e) => ["stopped", "not_shared"].includes(e.data?.reason));
 
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, release, Stop");
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel chat with a permission, release, Stop");
 } finally {
   await context.close();
   await coddy.close();

@@ -1,8 +1,9 @@
 # Coddy for Browser
 
 A Chrome extension that lets your own [Coddy](https://github.com/coddy-project/coddy-agent) agent work in the
-browser you use every day. A chat in Coddy - the web UI, the console, Telegram, a scheduled job - asks for a tab,
-reads the page, clicks, types, takes screenshots and moves files, and the extension does it in the tabs you share.
+browser you use every day. Chat with Coddy in the side panel next to the page, or let a chat anywhere else in Coddy -
+the web UI, the console, Telegram, a scheduled job - use your browser: it opens a tab, reads the page, clicks, types,
+takes screenshots and moves files, and the extension does it in the tabs you share.
 
 [Русская версия](README.ru.md)
 
@@ -22,14 +23,18 @@ executes the actions and asks you before Coddy touches a new website.
 - **The extension dials out.** It opens one WebSocket to the browser listener of `coddy serve` and keeps it open.
   Coddy's actions travel down that socket as requests the extension answers, so Coddy reaches a browser it has no
   route to: a laptop behind NAT works the same as a browser on the server itself.
-- **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its Chrome tab groups. You share a tab by
-  pressing **Share this tab with Coddy** in the toolbar popup, or by dragging it into the **Coddy** group. A chat that
-  works in a shared tab moves it into a group of its own, titled after the chat, and no other chat may act there.
-  A tab Coddy opens starts in the chat's group. Drag a tab out of a group to take it back.
+- **A chat beside the page.** The toolbar button opens the side panel: a chat with your Coddy. The tab you write
+  from goes into that chat's tab group, so "summarize this page" or "fill this form" works on the page in front of
+  you. Coddy asks in the panel before a tool with side effects runs, and the chat is an ordinary Coddy session you
+  can continue in the web UI.
+- **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its Chrome tab groups. You share a tab with
+  every chat by pressing **Share** in the side panel, or by dragging it into the **Coddy** group. A chat that works in
+  a shared tab moves it into a group of its own, titled after the chat, and no other chat may act there. A tab Coddy
+  opens starts in the chat's group. Drag a tab out of a group, or press **Take back**, to take it back.
 - **You approve websites.** Before the first action on a website, a small window of the extension asks: allow for
   this chat, always allow, or decline. A page cannot answer that question for you.
-- **You can stop it.** **Stop Coddy** in the popup, or the Stop button on the page Coddy works in, cancels every
-  action and ungroups every tab; the tabs stay open.
+- **You can stop it.** The stop button in the side panel's header, or the Stop button on the page Coddy works in,
+  cancels every action and ungroups every tab; the tabs stay open.
 
 The wire protocol is documented in Coddy: [Browser protocol](https://coddy.dev/docs/reference/browser-protocol). The feature
 from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.dev/docs/features/browser).
@@ -71,14 +76,21 @@ Then load `dist/chrome` the same way.
 
 ## Connect
 
-The settings page opens after the install, and later from **Settings** in the toolbar popup. Enter the listener
+The settings page opens after the install, and later from the settings button of the side panel. Enter the listener
 address (`http://127.0.0.1:12348` for a local server), the key and a name for this browser, such as
 `Chrome - laptop`, then press **Save and connect**. The name tells browsers apart when several are connected to one
 server: a chat lists them and selects one.
 
 ## Use it
 
-Share a tab, or let Coddy open one, and ask in any chat:
+Press the toolbar button and write in the side panel, on the page you want Coddy to work with:
+
+> Summarize this page and list the deadlines it mentions.
+
+The panel shows the answer as it streams, the tool calls as they run, and the questions Coddy asks: allow a tool,
+pick an answer. The clock button lists the chats of the panel, the plus starts a new one.
+
+From any other chat of Coddy, share a tab or let Coddy open one, and ask:
 
 > Open the pull request list of coddy-project/coddy-agent and tell me which ones wait for review.
 
@@ -97,6 +109,7 @@ starts with an hourglass.
 | `storage` | The connection settings and the websites you allowed. The key is readable only by the extension's own pages. |
 | `alarms` | Wake the service worker to reconnect after Chrome stopped it. |
 | `notifications` | Tell you that Coddy asks to use a website. |
+| `sidePanel` | The chat beside the page. |
 | `http://*/*`, `https://*/*` | Act on the websites you allow, and reach your Coddy server. |
 
 The extension sends nothing anywhere but your Coddy server. Pages Coddy reads still reach the model provider your
@@ -117,7 +130,8 @@ npm run e2e                   # the built extension in a real Chromium against a
 
 | File | What it does |
 | --- | --- |
-| `src/background.js` | The service worker: wiring, the messages of the popup and the settings page. |
+| `src/background.js` | The service worker: wiring, the messages of the side panel, the approval window and the settings page. |
+| `src/panel.js`, `src/chat.js`, `src/md.js` | The side panel's chat, its bridge to Coddy's `chat/*` methods, the Markdown it renders as DOM nodes. |
 | `src/connection.js` | The WebSocket, `initialize`, keepalive and reconnects. |
 | `src/rpc.js` | The JSON-RPC 2.0 peer. |
 | `src/commands.js` | Every action Coddy asks for, with the checks before it. |

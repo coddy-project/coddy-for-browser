@@ -36,13 +36,14 @@ function connection(over = {}) {
     settings: () => ({ ...settings, ...over }),
     version: "0.1.0",
     actions: ["snapshot"],
+    grant: () => "grant-1",
     onStatus: (s) => statuses.push(s),
     ...over.opts,
   });
   return { c, statuses };
 }
 
-test("initialize goes first with the key, the browser and its actions", async () => {
+test("initialize goes first with the key, the browser, its actions and its grant", async () => {
   let ready = false;
   const { c } = connection({ opts: { onReady: () => (ready = true) } });
   c.connect();
@@ -56,6 +57,7 @@ test("initialize goes first with the key, the browser and its actions", async ()
     key: settings.key,
     browser: { id: "browser-id-0001", name: "Chrome", version: "0.1.0" },
     actions: ["snapshot"],
+    grant: "grant-1",
   });
   ws.deliver({ id: hello.id, result: { protocolVersion: 1, server: { name: "coddy", version: "1.4.0" } } });
   await tick();

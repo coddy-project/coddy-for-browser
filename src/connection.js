@@ -21,8 +21,8 @@ export function backoff(attempt, random = Math.random) {
 
 export class Connection {
   // opts: WebSocket (class), settings() -> {address, key, id, name, enabled},
-  // version, actions, onReady(peer), onStatus(status), setup(peer) to
-  // register the handlers before initialize.
+  // version, actions, grant() -> the current selection, onReady(peer),
+  // onStatus(status), setup(peer) to register the handlers before initialize.
   constructor(opts) {
     Object.assign(this, opts);
     this.status = "Disconnected";
@@ -97,6 +97,7 @@ export class Connection {
             key: s.key,
             browser: { id: s.id, name: s.name, version: this.version },
             actions: this.actions,
+            grant: this.grant?.() || "",
           },
           { timeout: HANDSHAKE_MS },
         );

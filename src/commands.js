@@ -149,7 +149,8 @@ export class Commands {
         await this.waitLoaded(tab.id, signal);
         const now = await this.api.tabs.get(tab.id);
         await this.mark(tab.id, true, session);
-        return { url: now.url, title: now.title || "" };
+        result = { url: now.url, title: now.title || "" };
+        break;
       }
       case "snapshot":
         result = await page("snapshot");

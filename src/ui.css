@@ -30,22 +30,14 @@
 * {
   box-sizing: border-box;
 }
+/* A display rule of a class must not show what the hidden attribute hides. */
+[hidden] {
+  display: none !important;
+}
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-}
-body.popup {
-  width: 360px;
-}
-body.popup.approval {
-  width: auto;
-}
-body.approval #setup,
-body.approval #current,
-body.approval #chats-section,
-body.approval footer {
-  display: none;
 }
 body.options main {
   max-width: 640px;
@@ -209,4 +201,262 @@ button.danger {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+}
+
+/* The side panel: header, the current tab, the conversation, the composer. */
+body.panel {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-bar {
+  gap: 6px;
+  padding: 8px 10px;
+}
+.spacer {
+  flex: 1;
+}
+.status.dot-only {
+  margin-left: 0;
+  font-size: 0;
+  gap: 0;
+}
+button.icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-color: transparent;
+  background: transparent;
+}
+button.icon:hover {
+  border-color: var(--border);
+  background: var(--bg);
+}
+button.icon svg,
+button.send svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+button.icon.danger {
+  color: var(--danger);
+}
+button.icon.danger svg {
+  fill: currentColor;
+  stroke: none;
+}
+.chats {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  max-height: 45vh;
+  overflow: auto;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.chats button {
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chats button.current,
+.chats button:hover {
+  background: var(--bg);
+}
+.chats p {
+  margin: 6px;
+}
+.tabbar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  min-height: 30px;
+}
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+  font-weight: 500;
+}
+.tabbar small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+body.panel > .error,
+body.panel > .card,
+#approvals {
+  margin: 8px 10px 0;
+}
+#approvals:empty {
+  display: none;
+}
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+}
+.empty img {
+  border-radius: 10px;
+}
+.message {
+  overflow-wrap: anywhere;
+}
+.message.user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+.message.assistant p,
+.message.assistant ul,
+.message.assistant ol {
+  margin: 0 0 8px;
+}
+.message.assistant ul,
+.message.assistant ol {
+  padding-left: 20px;
+}
+.message.assistant pre,
+.card pre {
+  margin: 0 0 8px;
+  padding: 8px;
+  border-radius: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+}
+.message.assistant code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.message.assistant a {
+  color: var(--accent);
+}
+.message.notice {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.tool {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tool::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wait);
+  flex: none;
+}
+.tool[data-status="done"]::before {
+  background: var(--ok);
+}
+.tool[data-status="failed"]::before,
+.tool[data-status="stopped"]::before {
+  background: var(--danger);
+}
+.tool-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.card.ask {
+  border-color: var(--accent);
+}
+.card.ask label {
+  font-weight: 400;
+}
+.composer {
+  margin: 8px 10px 10px;
+  padding: 8px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.composer:focus-within {
+  border-color: var(--accent);
+}
+.composer textarea {
+  width: 100%;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  max-height: 30vh;
+}
+.composer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.composer-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.send {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  flex: none;
+}
+button.send.stop svg {
+  fill: currentColor;
+  stroke: none;
+}
+button.send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+body.approval main {
+  max-width: 480px;
+}
+button.link {
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  color: var(--accent);
+  font-size: 12px;
+}
+button.link:hover {
+  text-decoration: underline;
 }

@@ -20,8 +20,11 @@ const extension = path.join(root, "dist", "chrome");
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "coddy-for-browser-drive-"));
 const context = await chromium.launchPersistentContext(profile, {
   headless: true,
+  locale: "en-US",
+  // Chromium on Linux takes the language of its own controls from LANG.
+  env: { ...process.env, LANG: "en_US.UTF-8", LANGUAGE: "en" },
   ...(process.env.CODDY_BROWSER_PATH ? { executablePath: process.env.CODDY_BROWSER_PATH } : { channel: "chromium" }),
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--lang=en-US"],
 });
 const done = async (code) => {
   await context.close().catch(() => {});
@@ -34,7 +37,7 @@ try {
   const worker = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
   const origin = worker.url().split("/").slice(0, 3).join("/");
   context.on("page", async (page) => {
-    if (!page.url().startsWith(origin + "/popup.html?approval")) return;
+    if (!page.url().startsWith(origin + "/approval.html")) return;
     const allow = page.getByRole("button", { name: "Always allow" });
     while (!page.isClosed()) {
       await allow.click({ timeout: 2000 }).catch(() => {});

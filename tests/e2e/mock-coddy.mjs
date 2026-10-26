@@ -130,6 +130,55 @@ export async function startMockCoddy({ key }) {
     if (url.pathname === "/download") return res.writeHead(200).end("download fixture");
     res.writeHead(404).end();
   });
+  // chatRequest plays Coddy's side of the side panel's chat: a chat/send
+  // runs a scripted turn that asks the panel for a permission, reads the tab
+  // the person wrote from, and answers.
+  const answer = (socket, id, result) => socket.send(JSON.stringify({ jsonrpc: "2.0", id, result }));
+  state.chats = [];
+  async function chatRequest(socket, msg) {
+    const p = msg.params || {};
+    if (msg.method === "chat/new") {
+      const sessionId = `sess_mock_${state.chats.length + 1}`;
+      state.chats.push({ sessionId, title: "", messages: [] });
+      return answer(socket, msg.id, { sessionId });
+    }
+    if (msg.method === "chat/list")
+      return answer(socket, msg.id, { chats: state.chats.filter((c) => c.messages.length).map(({ sessionId, title }) => ({ sessionId, title })) });
+    if (msg.method === "chat/messages")
+      return answer(socket, msg.id, { messages: state.chats.find((c) => c.sessionId === p.sessionId)?.messages || [] });
+    if (msg.method !== "chat/send")
+      return socket.send(JSON.stringify({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "method not found" } }));
+    const chat = state.chats.find((c) => c.sessionId === p.sessionId);
+    state.sent = p;
+    const update = (u) => socket.send(JSON.stringify({ jsonrpc: "2.0", method: "chat/update", params: { sessionId: p.sessionId, ...u } }));
+    update({ kind: "tool", toolCallId: "t1", title: "browser", status: "pending" });
+    const allowed = await coddyAsk("chat/permission", {
+      sessionId: p.sessionId,
+      title: "browser",
+      detail: JSON.stringify({ action: "snapshot", tab_id: p.tab?.id }),
+      options: [
+        { optionId: "allow", name: "Allow", kind: "allow_once" },
+        { optionId: "reject", name: "Reject", kind: "reject_once" },
+      ],
+    }).catch(() => ({}));
+    state.permission = allowed.optionId;
+    let page = {};
+    if (allowed.optionId === "allow") page = await api.command("snapshot", { tabId: p.tab.id, session: { id: p.sessionId, title: "Read the page" } });
+    update({ kind: "tool", toolCallId: "t1", status: "completed" });
+    const text = `The page is **${page.title}**.`;
+    for (const piece of [text.slice(0, 9), text.slice(9)]) update({ kind: "text", text: piece });
+    chat.title = "Read the page";
+    chat.messages.push({ role: "user", text: p.text }, { role: "assistant", text });
+    answer(socket, msg.id, { stopReason: "end_turn" });
+  }
+  function coddyAsk(method, params) {
+    const id = crypto.randomBytes(24).toString("hex");
+    return new Promise((resolve, reject) => {
+      state.pending.set(id, { resolve, reject });
+      state.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    });
+  }
+
   server.on("upgrade", (req, raw) => {
     const url = new URL(req.url, "http://x");
     const origin = req.headers.origin || "";
@@ -156,7 +205,7 @@ export async function startMockCoddy({ key }) {
             JSON.stringify({
               jsonrpc: "2.0",
               id: msg.id,
-              result: { protocolVersion: 1, server: { name: "coddy", version: "mock" }, limits: { maxFileBytes: 33554432 } },
+              result: { protocolVersion: 1, server: { name: "coddy", version: "dev" }, limits: { maxFileBytes: 33554432 } },
             }),
           );
           return;
@@ -168,6 +217,7 @@ export async function startMockCoddy({ key }) {
           return;
         }
         if (msg.method === "browser/stop") return void state.stops++;
+        if (msg.method && msg.id !== undefined) return void chatRequest(socket, msg);
         if (msg.method) return void state.notes.push(msg.method);
         const p = state.pending.get(msg.id);
         if (p) {
@@ -180,9 +230,11 @@ export async function startMockCoddy({ key }) {
       },
     );
   });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  // CODDY_MOCK_PORT pins the port, for screenshots that show the default
+  // address of the listener.
+  await new Promise((r) => server.listen(Number(process.env.CODDY_MOCK_PORT) || 0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  return {
+  const api = {
     base,
     state,
     // command sends browser/command and resolves with its answer.
@@ -205,4 +257,5 @@ export async function startMockCoddy({ key }) {
     },
     close: () => new Promise((r) => (state.socket?.close(), server.close(r))),
   };
+  return api;
 }

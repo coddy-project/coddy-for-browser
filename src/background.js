@@ -1,10 +1,12 @@
 // The service worker: the connection to Coddy, the tab groups, the website
-// approvals and the commands, and the messages of the extension's own pages.
+// approvals, the commands, the side panel's chat, and the messages of the
+// extension's own pages.
 
 import { Connection } from "./connection.js";
 import { Groups } from "./groups.js";
 import { Approvals } from "./approvals.js";
 import { Commands, ACTIONS } from "./commands.js";
+import { ChatBridge } from "./chat.js";
 import { Debugger } from "./input.js";
 import { indicator } from "./indicator.js";
 import { serverURL, checkKey, checkName, isWebPage } from "./policy.js";
@@ -45,14 +47,17 @@ const connection = new Connection({
   settings: () => settings,
   version,
   actions: ACTIONS,
+  grant: () => grant,
   setup(peer) {
     peer.onRequest("browser/command", (cmd, { signal }) => commands.handle(cmd, signal));
     peer.onNotification("$/cancelRequest", ({ id }) => peer.cancel(id));
     peer.onNotification("browser/turnEnded", ({ sessionId }) => turnEnded(sessionId));
+    chat.setup(peer);
   },
   onReady: () => publish(),
   onStatus: () => void badge(),
 });
+const chat = new ChatBridge({ connection, groups, publish: () => publish() });
 
 let publishing = Promise.resolve();
 // publish announces every tab Coddy may reach, in order, so an announcement
@@ -94,7 +99,8 @@ let approvalWindow = null;
 async function approvalsChanged() {
   await badge();
   const pending = approvals.list();
-  if (!pending.length) return;
+  // An open side panel shows the question itself.
+  if (!pending.length || chat.open()) return;
   // The question needs a person: a small window of the extension's own, the
   // way a site permission prompt of the browser comes up.
   if (approvalWindow !== null) {
@@ -105,7 +111,7 @@ async function approvalsChanged() {
     }
   }
   const w = await api.windows
-    .create({ url: api.runtime.getURL("popup.html?approval=1"), type: "popup", width: 420, height: 560, focused: true })
+    .create({ url: api.runtime.getURL("approval.html"), type: "popup", width: 420, height: 560, focused: true })
     .catch(() => null);
   approvalWindow = w?.id ?? null;
   const first = pending[0];
@@ -132,8 +138,21 @@ async function stop() {
   }
 }
 
-async function state() {
-  const [active] = await api.tabs.query({ active: true, lastFocusedWindow: true });
+// currentTab is the page the person looks at in a window: its active tab, or,
+// when that is a page of the extension itself (the panel opened as a tab), the
+// web page they looked at last.
+async function currentTab(windowId) {
+  const tabs = await api.tabs.query(windowId ? { windowId } : { lastFocusedWindow: true });
+  const active = tabs.find((t) => t.active);
+  if (active && isWebPage(active.url || "")) return active;
+  if (active && !active.url?.startsWith(api.runtime.getURL(""))) return active;
+  return tabs
+    .filter((t) => isWebPage(t.url || ""))
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+}
+
+async function state(msg = {}) {
+  const active = await currentTab(msg.windowId);
   let current = null;
   if (active && isWebPage(active.url || "")) {
     const owner = groups.ownerOf(active);
@@ -200,6 +219,16 @@ const handlers = {
   },
 };
 
+api.runtime.onConnect.addListener((port) => {
+  const own = port.sender?.id === api.runtime.id && port.sender?.url?.startsWith(api.runtime.getURL(""));
+  if (port.name !== "coddy-panel" || !own) {
+    port.disconnect();
+    return;
+  }
+  chat.attach(port);
+  void badge();
+});
+
 api.runtime.onMessage.addListener((msg, sender, respond) => {
   const own = sender.id === api.runtime.id && sender.url?.startsWith(api.runtime.getURL(""));
   // A page reaches the worker only through the indicator's Stop button,
@@ -240,6 +269,8 @@ api.alarms.onAlarm.addListener(() => {
 
 async function initialize() {
   await api.storage.local.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" });
+  // The toolbar button opens the chat beside the page, as a side panel.
+  await api.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   await api.alarms.create("coddy-keepalive", { periodInMinutes: 0.5 });
   const stored = (await api.storage.local.get("settings")).settings || {};
   settings = { ...settings, ...stored };

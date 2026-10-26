@@ -170,6 +170,19 @@ export class Groups {
     return this.api.tabs.get(tabId);
   }
 
+  // adopt is the person giving a tab to a chat of the side panel: the tab
+  // they write from goes into the chat's group whatever group it was in.
+  async adopt(tabId, session) {
+    const tab = await this.api.tabs.get(tabId);
+    if (!isWebPage(tab.url || "")) throw new Error("Only ordinary web pages can be given to Coddy");
+    if (this.ownerOf(tab) === session.id) {
+      await this.retitle(session);
+      return tab;
+    }
+    await this.chatGroup(session, tab);
+    return this.api.tabs.get(tabId);
+  }
+
   // open creates a tab for the chat, in its group, without taking focus.
   async open(url, session) {
     const chat = this.state.chats[session.id];

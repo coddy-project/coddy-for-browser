@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Coddy</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="panel">
+    <header class="bar panel-bar">
+      <img src="icons/icon-32.png" alt="" width="18" height="18" />
+      <strong>Coddy</strong>
+      <span id="status" class="status dot-only" role="status" title="Loading">Loading&hellip;</span>
+      <span class="spacer"></span>
+      <button id="history" class="icon" type="button" title="Chats" aria-label="Chats" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v4h4" /></svg>
+      </button>
+      <button id="new" class="icon" type="button" title="New chat" aria-label="New chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+      </button>
+      <button id="settings" class="icon" type="button" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"
+          />
+        </svg>
+      </button>
+      <button id="stop-all" class="icon danger" type="button" title="Stop Coddy: cancel every action and withdraw every tab" aria-label="Stop Coddy">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+      </button>
+    </header>
+    <nav id="chats" class="chats" hidden aria-label="Chats"></nav>
+    <div id="tabbar" class="tabbar" aria-live="polite"></div>
+    <p id="error" class="error" role="alert" hidden></p>
+    <section id="offline" class="card offline" hidden>
+      <p id="offline-text">Not connected to Coddy.</p>
+      <button id="open-settings" class="primary" type="button">Settings</button>
+    </section>
+    <section id="approvals" aria-live="assertive"></section>
+    <main id="messages" class="messages" aria-live="polite">
+      <div id="empty" class="empty">
+        <img src="icons/icon-48.png" alt="" width="40" height="40" />
+        <p>What should Coddy do in this tab?</p>
+      </div>
+    </main>
+    <form id="composer" class="composer">
+      <textarea id="prompt" rows="2" placeholder="Ask Coddy to work with this page" aria-label="Message"></textarea>
+      <div class="composer-row">
+        <small id="chat-title" class="muted"></small>
+        <button id="send" class="send" type="submit" title="Send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+        </button>
+      </div>
+    </form>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

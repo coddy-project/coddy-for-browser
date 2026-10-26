@@ -91,3 +91,15 @@ test("a long chat title is shortened and a missing one falls back to the id", ()
   assert.equal(chatTitle({ id: "sess_0123456789", title: "x".repeat(40) }).length, 30);
   assert.equal(chatTitle({ id: "sess_0123456789" }), "Coddy 456789");
 });
+
+test("the tab the person writes from goes into the panel chat's group, from any group", async () => {
+  const { api, groups } = await setup();
+  const tab = api.addTab("https://example.com/", "Example");
+  await groups.open("https://other.example/", { id: "sess_other" });
+  await api.tabs.group({ tabIds: [tab.id], groupId: groups.state.chats.sess_other.groupId });
+  await groups.adopt(tab.id, { id: "sess_panel", title: "Panel chat" });
+  assert.equal(groups.ownerOf(api.tabsById.get(tab.id)), "sess_panel");
+  await groups.adopt(tab.id, { id: "sess_panel" });
+  assert.equal(groups.ownerOf(api.tabsById.get(tab.id)), "sess_panel");
+  await assert.rejects(groups.adopt(api.addTab("chrome://settings").id, { id: "sess_panel" }), /web pages/);
+});
