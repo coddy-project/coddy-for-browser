@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Coddy for Browser - Settings</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="options">
+    <header class="bar">
+      <img src="icons/icon-48.png" alt="" width="28" height="28" />
+      <h1>Coddy for Browser</h1>
+      <span id="status" class="status" role="status">Loading&hellip;</span>
+    </header>
+    <main>
+      <p id="error" class="error" role="alert" hidden></p>
+      <section class="card">
+        <h2>Connection</h2>
+        <p class="muted">
+          The extension connects to the browser listener of your <code>coddy serve</code> and lets its chats
+          use the tabs you share. Turn the listener on with <code>browser.enable</code> in Coddy's configuration.
+        </p>
+        <form id="connect">
+          <label
+            >Server address
+            <input id="address" type="url" placeholder="http://127.0.0.1:12348" required spellcheck="false" />
+          </label>
+          <label
+            >Extension key
+            <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="browser.token of the server" />
+          </label>
+          <label
+            >Browser name
+            <input id="name" maxlength="100" placeholder="Chrome - laptop" />
+          </label>
+          <p class="muted">The name tells this browser apart when several are connected to one server.</p>
+          <div class="row">
+            <button class="primary" type="submit">Save and connect</button>
+            <button id="disconnect" type="button">Disconnect</button>
+          </div>
+        </form>
+        <p id="server" class="muted"></p>
+      </section>
+      <section class="card">
+        <h2>Always allowed websites</h2>
+        <p class="muted">Coddy acts on these sites without asking. Every other site asks first.</p>
+        <ul id="allowed" class="list"></ul>
+      </section>
+      <section class="card">
+        <h2>How sharing works</h2>
+        <p>
+          Coddy reaches only the tabs in its tab groups. Share a tab from the toolbar button, or drag it into the
+          <strong>Coddy</strong> group. A chat that works in a shared tab moves it into a group of its own, named after
+          the chat; a tab Coddy opens starts there. Drag a tab out of a group to take it back.
+        </p>
+        <p><strong>Stop Coddy</strong> cancels every action and ungroups every tab; the tabs stay open.</p>
+      </section>
+      <p id="version" class="muted"></p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

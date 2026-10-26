@@ -1,0 +1,237 @@
+// Tabs Coddy may reach live in Chrome tab groups, so the user sees them in the
+// tab strip and moves them by dragging:
+// - the shared "Coddy" group holds the tabs the user shares; any chat may
+//   take one;
+// - every chat that works in the browser has a group of its own, titled after
+//   the chat, holding the tabs it took or opened; no other chat may act there.
+// Group ids last as long as the browser runs, so the bookkeeping lives in
+// session storage and survives the service worker being torn down.
+
+import { isWebPage } from "./policy.js";
+
+export const SHARED_TITLE = "Coddy";
+const SHARED_COLOR = "purple";
+const PALETTE = ["blue", "cyan", "green", "orange", "pink", "red", "yellow"];
+const WORKING = "⏳ ";
+const NONE = -1;
+
+export function colorFor(sessionId) {
+  let h = 0;
+  for (const ch of String(sessionId)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
+export function chatTitle(session) {
+  const title = String(session?.title || "").trim();
+  if (title) return title.length > 30 ? title.slice(0, 29) + "…" : title;
+  return "Coddy " + String(session?.id || "").slice(-6);
+}
+
+export class Groups {
+  // api is chrome (or a fake in tests); store keeps {shared, chats}.
+  constructor(api, store) {
+    this.api = api;
+    this.store = store;
+    this.state = { shared: null, chats: {} };
+    this.working = new Set();
+  }
+
+  async load() {
+    this.state = (await this.store.get()) || { shared: null, chats: {} };
+    this.state.chats ||= {};
+  }
+
+  async save() {
+    await this.store.set(this.state);
+  }
+
+  // ownerOf says whose a tab is: "" for the shared group, a session id for a
+  // chat's group, null for a tab Coddy may not reach.
+  ownerOf(tab) {
+    if (!tab || tab.groupId === undefined || tab.groupId === NONE) return null;
+    if (tab.groupId === this.state.shared) return "";
+    for (const [sessionId, chat] of Object.entries(this.state.chats))
+      if (chat.groupId === tab.groupId) return sessionId;
+    return null;
+  }
+
+  // forgetMissing drops the groups the user closed or ungrouped away.
+  async forgetMissing() {
+    const alive = async (id) => {
+      if (id === null || id === undefined) return false;
+      try {
+        await this.api.tabGroups.get(id);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    let changed = false;
+    if (this.state.shared !== null && !(await alive(this.state.shared))) {
+      this.state.shared = null;
+      changed = true;
+    }
+    for (const [sessionId, chat] of Object.entries(this.state.chats))
+      if (!(await alive(chat.groupId))) {
+        delete this.state.chats[sessionId];
+        changed = true;
+      }
+    if (changed) await this.save();
+  }
+
+  groupRemoved(groupId) {
+    if (this.state.shared === groupId) this.state.shared = null;
+    for (const [sessionId, chat] of Object.entries(this.state.chats))
+      if (chat.groupId === groupId) delete this.state.chats[sessionId];
+    return this.save();
+  }
+
+  // tabs is what the extension reports to Coddy: every web page in a Coddy
+  // group, with the chat that holds it.
+  async tabs() {
+    await this.forgetMissing();
+    const out = [];
+    for (const tab of await this.api.tabs.query({})) {
+      const owner = this.ownerOf(tab);
+      if (owner === null || !isWebPage(tab.url || "")) continue;
+      const entry = { id: tab.id, url: tab.url, title: (tab.title || "").slice(0, 1000) };
+      if (owner) entry.sessionId = owner;
+      out.push(entry);
+    }
+    return out.slice(0, 100);
+  }
+
+  async sharedGroup(windowId, tabId) {
+    if (this.state.shared !== null) {
+      try {
+        await this.api.tabGroups.get(this.state.shared);
+        await this.api.tabs.group({ tabIds: [tabId], groupId: this.state.shared });
+        return this.state.shared;
+      } catch {
+        this.state.shared = null;
+      }
+    }
+    const groupId = await this.api.tabs.group({ tabIds: [tabId], createProperties: { windowId } });
+    await this.api.tabGroups.update(groupId, { title: SHARED_TITLE, color: SHARED_COLOR });
+    this.state.shared = groupId;
+    await this.save();
+    return groupId;
+  }
+
+  // share is the user handing a tab to Coddy: into the shared group.
+  async share(tabId) {
+    const tab = await this.api.tabs.get(tabId);
+    if (!isWebPage(tab.url || "")) throw new Error("Only ordinary web pages can be shared");
+    await this.sharedGroup(tab.windowId, tabId);
+  }
+
+  // unshare takes a tab out of every Coddy group; it stays open.
+  async unshare(tabId) {
+    await this.api.tabs.ungroup([tabId]);
+  }
+
+  async chatGroup(session, tab) {
+    const chat = this.state.chats[session.id];
+    if (chat) {
+      try {
+        await this.api.tabGroups.get(chat.groupId);
+        await this.api.tabs.group({ tabIds: [tab.id], groupId: chat.groupId });
+        await this.retitle(session);
+        return chat.groupId;
+      } catch {
+        delete this.state.chats[session.id];
+      }
+    }
+    const groupId = await this.api.tabs.group({ tabIds: [tab.id], createProperties: { windowId: tab.windowId } });
+    const title = chatTitle(session);
+    this.state.chats[session.id] = { groupId, title };
+    await this.api.tabGroups.update(groupId, { title: this.decorate(session.id, title), color: colorFor(session.id) });
+    await this.save();
+    return groupId;
+  }
+
+  // claim moves a tab the chat may take into the chat's group: a shared tab,
+  // or one already its own. Anything else is refused.
+  async claim(tabId, session) {
+    const tab = await this.api.tabs.get(tabId);
+    const owner = this.ownerOf(tab);
+    if (owner === null) {
+      const e = new Error("The tab is not shared with Coddy; ask the user to share it");
+      e.reason = "not_shared";
+      throw e;
+    }
+    if (owner && owner !== session.id) {
+      const e = new Error("The tab is in another chat's tab group");
+      e.reason = "other_chat";
+      throw e;
+    }
+    if (owner === "") await this.chatGroup(session, tab);
+    else await this.retitle(session);
+    return this.api.tabs.get(tabId);
+  }
+
+  // open creates a tab for the chat, in its group, without taking focus.
+  async open(url, session) {
+    const chat = this.state.chats[session.id];
+    let windowId;
+    if (chat) {
+      try {
+        windowId = (await this.api.tabGroups.get(chat.groupId)).windowId;
+      } catch {}
+    }
+    const tab = await this.api.tabs.create({ url, active: false, ...(windowId ? { windowId } : {}) });
+    await this.chatGroup(session, tab);
+    return tab;
+  }
+
+  // release hands the chat's tabs back to the shared group.
+  async release(sessionId) {
+    const chat = this.state.chats[sessionId];
+    if (!chat) return 0;
+    const tabs = (await this.api.tabs.query({})).filter((t) => t.groupId === chat.groupId);
+    delete this.state.chats[sessionId];
+    this.working.delete(sessionId);
+    for (const tab of tabs) await this.sharedGroup(tab.windowId, tab.id);
+    await this.save();
+    return tabs.length;
+  }
+
+  // stopAll is the user's Stop: every Coddy group is dissolved and every tab
+  // stays open outside them.
+  async stopAll() {
+    const managed = (await this.api.tabs.query({})).filter((t) => this.ownerOf(t) !== null).map((t) => t.id);
+    this.state = { shared: null, chats: {} };
+    this.working.clear();
+    await this.save();
+    if (managed.length) await this.api.tabs.ungroup(managed);
+  }
+
+  decorate(sessionId, title) {
+    return (this.working.has(sessionId) ? WORKING : "") + title;
+  }
+
+  async retitle(session) {
+    const chat = this.state.chats[session.id];
+    if (!chat) return;
+    if (session.title) chat.title = chatTitle(session);
+    try {
+      await this.api.tabGroups.update(chat.groupId, { title: this.decorate(session.id, chat.title) });
+    } catch {}
+  }
+
+  // setWorking marks a chat's group while it acts, and unmarks it when its
+  // turn ends.
+  async setWorking(session, working) {
+    if (working) this.working.add(session.id);
+    else this.working.delete(session.id);
+    await this.retitle(session);
+  }
+
+  chats() {
+    return Object.entries(this.state.chats).map(([sessionId, chat]) => ({
+      sessionId,
+      title: chat.title,
+      working: this.working.has(sessionId),
+    }));
+  }
+}

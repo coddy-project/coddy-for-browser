@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - run: npm run build
+      - name: The version of package.json is the version of the manifest
+        run: node -e "const p=require('./package.json'),m=require('./dist/chrome/manifest.json'); if(p.version!==m.version) process.exit(1)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coddy-for-browser
+          path: dist/coddy-for-browser-*.zip
+
+  e2e:
+    name: Real Chromium against a mock of Coddy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm run build
+      - run: npm i --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+        env:
+          CODDY_SCREENSHOT_DIR: screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: screenshots
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: The tag is the version of package.json
+        run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
+      - run: npm run build
+      - name: Publish the archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/coddy-for-browser-*.zip --title "$GITHUB_REF_NAME" --generate-notes
