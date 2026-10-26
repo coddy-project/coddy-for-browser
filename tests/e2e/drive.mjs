@@ -5,7 +5,10 @@
 //
 //   CODDY_URL=http://127.0.0.1:12348 CODDY_KEY=... node tests/e2e/drive.mjs
 //
-// It prints "CONNECTED" once the extension reports Connected.
+// It prints "CONNECTED" once the extension reports Connected. With
+// CODDY_PANEL_PAGE and CODDY_PANEL_PROMPT it then opens that page, writes the
+// prompt in the side panel from it, allows every tool the panel is asked
+// about and prints "ANSWER: <text>" once the answer is in.
 
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -52,6 +55,24 @@ try {
   await options.getByRole("button", { name: "Save and connect" }).click();
   await options.locator("#status").getByText("Connected", { exact: true }).waitFor({ timeout: 20000 });
   console.log("CONNECTED");
+  if (process.env.CODDY_PANEL_PROMPT) {
+    const page = await context.newPage();
+    await page.goto(process.env.CODDY_PANEL_PAGE);
+    await page.bringToFront();
+    const panel = await context.newPage();
+    await panel.goto(origin + "/panel.html");
+    await panel.getByText("What should Coddy do in this tab?").waitFor();
+    await panel.locator("#prompt").fill(process.env.CODDY_PANEL_PROMPT);
+    await panel.locator("#prompt").press("Enter");
+    const allow = panel.locator(".card.ask button.primary, .card.approval button.primary");
+    const answer = panel.locator(".message.assistant");
+    for (let i = 0; i < 600 && !(await answer.count()); i++) {
+      if (await allow.count()) await allow.first().click().catch(() => {});
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await panel.locator("#send[title=Send]").waitFor({ timeout: 30000 });
+    console.log("ANSWER: " + (await answer.last().innerText()).replace(/\s+/g, " "));
+  }
 } catch (e) {
   console.error(e);
   await done(1);

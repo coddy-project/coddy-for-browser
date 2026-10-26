@@ -17,6 +17,32 @@ let answerText = "";
 const tools = new Map();
 const cards = new Map();
 let rendered = "";
+// The approval modes of a chat, as Coddy names them: ask before every tool
+// with side effects, approve file edits by themselves, or approve all.
+const MODES = [
+  {
+    value: "ask",
+    label: "Ask",
+    name: "Ask every time",
+    hint: "Coddy asks before every tool that changes something.",
+    icon: "M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.4 14a1.5 1.5 0 0 1 2.4-1.8L8 15",
+  },
+  {
+    value: "accept_edits",
+    label: "Edits",
+    name: "Approve edits",
+    hint: "File edits go ahead; commands and the rest ask.",
+    icon: "M4 5l7 7-7 7M12 5l7 7-7 7",
+  },
+  {
+    value: "bypass",
+    label: "Skip",
+    name: "Skip all approvals",
+    hint: "Every tool runs without asking, commands included.",
+    icon: "M12 3 2 20h20L12 3ZM12 10v4M12 17h.01",
+  },
+];
+let mode = "";
 
 // call asks the service worker to run a chat request on Coddy.
 function call(type, data = {}) {
@@ -138,6 +164,62 @@ function setBusy(on) {
     : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>';
 }
 
+function showMode(value) {
+  mode = value || mode || "ask";
+  const m = MODES.find((x) => x.value === mode) || MODES[0];
+  $("mode-label").textContent = m.label;
+  $("mode-icon").setAttribute("d", m.icon);
+  $("mode").dataset.mode = m.value;
+  $("mode").title = `${m.name}: ${m.hint}`;
+}
+
+async function pickMode(value) {
+  if (value === "bypass" && mode !== "bypass") {
+    const ok = confirm(
+      "Skip all approvals?\n\nCoddy will run every tool of this chat without asking, shell commands included. The extension still asks before Coddy acts on a new website.",
+    );
+    if (!ok) return;
+  }
+  await chrome.storage.local.set({ panelMode: value }).catch(() => {});
+  if (sessionId) {
+    const res = await call("mode", { sessionId, permissionMode: value });
+    showMode(res.permissionMode);
+  } else showMode(value);
+}
+
+$("mode").onclick = () => {
+  const menu = $("mode-menu");
+  if (!menu.hidden) {
+    menu.hidden = true;
+    $("mode").setAttribute("aria-expanded", "false");
+    return;
+  }
+  menu.replaceChildren(
+    ...MODES.map((m) => {
+      const item = el(
+        "button",
+        { type: "button", role: "menuitemradio", "aria-checked": String(m.value === mode), class: m.value === mode ? "current" : "" },
+        el("span", { class: "menu-name" }, m.name),
+        el("small", { class: "muted" }, m.hint),
+      );
+      item.onclick = () => {
+        menu.hidden = true;
+        $("mode").setAttribute("aria-expanded", "false");
+        void pickMode(m.value).catch(showError);
+      };
+      return item;
+    }),
+  );
+  menu.hidden = false;
+  $("mode").setAttribute("aria-expanded", "true");
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("mode-menu").hidden) {
+    $("mode-menu").hidden = true;
+    $("mode").setAttribute("aria-expanded", "false");
+  }
+});
+
 async function remember(id) {
   sessionId = id;
   await chrome.storage.session.set({ [`panel:${windowId}`]: id }).catch(() => {});
@@ -158,14 +240,17 @@ async function openChat(id, title = "") {
   await remember(id);
   $("chat-title").textContent = title;
   if (!id) return;
-  const { messages } = await call("messages", { sessionId: id });
+  const { messages, permissionMode } = await call("messages", { sessionId: id });
+  showMode(permissionMode);
   for (const m of messages) addMessage(m.role, m.text);
 }
 
 async function send(text) {
   if (!sessionId) {
-    const created = await call("new");
+    const preferred = (await chrome.storage.local.get("panelMode").catch(() => ({}))).panelMode;
+    const created = await call("new", preferred ? { permissionMode: preferred } : {});
     await remember(created.sessionId);
+    showMode(created.permissionMode);
   }
   addMessage("user", text);
   answer = null;
@@ -301,6 +386,7 @@ async function refresh() {
 }
 
 windowId = (await chrome.windows.getCurrent()).id;
+showMode((await chrome.storage.local.get("panelMode").catch(() => ({}))).panelMode);
 await refresh();
 setInterval(refresh, 1000);
 const saved = (await chrome.storage.session.get(`panel:${windowId}`).catch(() => ({})))[`panel:${windowId}`];

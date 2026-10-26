@@ -166,6 +166,12 @@ try {
   await panel.getByText("What should Coddy do in this tab?").waitFor();
   await panel.locator("#tabbar").getByText("Coddy takes this tab when you send").waitFor();
   await capture(panel, "panel-empty", [420], { fit: false });
+  // The approval mode is picked before the chat exists and goes with chat/new.
+  await panel.getByRole("button", { name: /Ask/ }).click();
+  await panel.getByRole("menuitemradio", { name: /Approve edits/ }).waitFor();
+  await capture(panel, "panel-modes", [420], { fit: false });
+  await panel.getByRole("menuitemradio", { name: /Approve edits/ }).click();
+  await panel.locator("#mode-label").getByText("Edits").waitFor();
   await panel.locator("#prompt").fill("Read this page");
   await panel.locator("#prompt").press("Enter");
   await panel.getByRole("button", { name: "Allow", exact: true }).waitFor();
@@ -182,6 +188,13 @@ try {
   assert.equal(await panel.locator(".tool[data-status=done]").count(), 1);
   await panel.locator("#tabbar").getByText("in this chat").waitFor();
   await capture(panel, "panel-answer", [420], { fit: false });
+  assert.equal(coddy.state.chats[0].permissionMode, "accept_edits");
+  // Skip all approvals asks first, then changes the chat on Coddy.
+  panel.once("dialog", (d) => d.accept());
+  await panel.getByRole("button", { name: /Edits/ }).click();
+  await panel.getByRole("menuitemradio", { name: /Skip all approvals/ }).click();
+  await panel.locator("#mode-label").getByText("Skip").waitFor();
+  assert.equal(coddy.state.chats[0].permissionMode, "bypass");
   // Take back ungroups the tab; Share puts it in the shared group.
   await panel.locator("#tabbar").getByRole("button", { name: "Take back" }).click();
   await waitFor("the tab out of every group", () => !coddy.state.tabs.find((t) => t.id === mineTab));

@@ -47,6 +47,14 @@
     <form id="composer" class="composer">
       <textarea id="prompt" rows="2" placeholder="Ask Coddy to work with this page" aria-label="Message"></textarea>
       <div class="composer-row">
+        <div class="mode-picker">
+          <button id="mode" class="mode" type="button" aria-haspopup="menu" aria-expanded="false" title="When Coddy asks before it acts">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="mode-icon" d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.4 14a1.5 1.5 0 0 1 2.4-1.8L8 15" /></svg>
+            <span id="mode-label">Ask</span>
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          <div id="mode-menu" class="menu" role="menu" hidden></div>
+        </div>
         <small id="chat-title" class="muted"></small>
         <button id="send" class="send" type="submit" title="Send" aria-label="Send">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>

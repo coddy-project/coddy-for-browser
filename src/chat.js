@@ -105,7 +105,7 @@ export class ChatBridge {
         case "messages":
           return reply(await this.peer().request("chat/messages", { sessionId: msg.sessionId }));
         case "new": {
-          const created = await this.peer().request("chat/new", {});
+          const created = await this.peer().request("chat/new", msg.permissionMode ? { permissionMode: msg.permissionMode } : {});
           this.watching.set(port, created.sessionId);
           return reply(created);
         }
@@ -125,6 +125,8 @@ export class ChatBridge {
           );
           return reply(result);
         }
+        case "mode":
+          return reply(await this.peer().request("chat/mode", { sessionId: msg.sessionId, permissionMode: msg.permissionMode }));
         case "cancel":
           this.peer().notify("chat/cancel", { sessionId: msg.sessionId });
           return reply(true);

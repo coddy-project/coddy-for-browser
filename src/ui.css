@@ -423,6 +423,7 @@ body.panel > .card,
   gap: 8px;
 }
 .composer-row small {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -459,4 +460,75 @@ button.link {
 }
 button.link:hover {
   text-decoration: underline;
+}
+.mode-picker {
+  position: relative;
+  flex: none;
+}
+button.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+button.mode:hover,
+button.mode[aria-expanded="true"] {
+  border-color: var(--border);
+  color: var(--text);
+}
+button.mode[data-mode="bypass"] {
+  color: var(--wait);
+}
+button.mode svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+button.mode .chevron {
+  width: 12px;
+  height: 12px;
+}
+.menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  width: 260px;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.menu button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+  padding: 6px 8px;
+}
+.menu button:hover,
+.menu button.current {
+  background: var(--bg);
+}
+.menu button.current .menu-name::after {
+  content: " \2713";
+  color: var(--accent);
+}
+.menu small {
+  font-size: 11px;
+  white-space: normal;
+  overflow: visible;
+  flex: none;
 }

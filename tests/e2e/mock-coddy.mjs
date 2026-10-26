@@ -139,13 +139,22 @@ export async function startMockCoddy({ key }) {
     const p = msg.params || {};
     if (msg.method === "chat/new") {
       const sessionId = `sess_mock_${state.chats.length + 1}`;
-      state.chats.push({ sessionId, title: "", messages: [] });
-      return answer(socket, msg.id, { sessionId });
+      const permissionMode = p.permissionMode || "ask";
+      state.chats.push({ sessionId, title: "", messages: [], permissionMode });
+      return answer(socket, msg.id, { sessionId, permissionMode });
+    }
+    if (msg.method === "chat/mode") {
+      const chat = state.chats.find((c) => c.sessionId === p.sessionId);
+      chat.permissionMode = p.permissionMode;
+      return answer(socket, msg.id, { permissionMode: p.permissionMode });
     }
     if (msg.method === "chat/list")
       return answer(socket, msg.id, { chats: state.chats.filter((c) => c.messages.length).map(({ sessionId, title }) => ({ sessionId, title })) });
     if (msg.method === "chat/messages")
-      return answer(socket, msg.id, { messages: state.chats.find((c) => c.sessionId === p.sessionId)?.messages || [] });
+      return answer(socket, msg.id, {
+        messages: state.chats.find((c) => c.sessionId === p.sessionId)?.messages || [],
+        permissionMode: state.chats.find((c) => c.sessionId === p.sessionId)?.permissionMode || "ask",
+      });
     if (msg.method !== "chat/send")
       return socket.send(JSON.stringify({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "method not found" } }));
     const chat = state.chats.find((c) => c.sessionId === p.sessionId);
