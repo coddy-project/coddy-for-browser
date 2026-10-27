@@ -419,6 +419,11 @@ addons.mozilla.org where publishing there is switched on; the stores publish the
 direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of `main` and releases
 it whatever the variable says, or, with a tag given, releases that tag again.
 
+What changed in a version is its section of [CHANGELOG.md](CHANGELOG.md): the GitHub release shows it as "What
+changed" and addons.mozilla.org as the version's release notes. A pull request that changes the extension raises
+`package.json` to its version and adds its lines under `## <version>`; the unit tests fail while the version of
+`package.json` has no section.
+
 One job builds the packages, and the GitHub release and each store are jobs of their own that take those packages. A
 job that failed is run again alone (**Re-run failed jobs**, or that job's own re-run), and a store job skips a version
 the store already holds, so a release half done is finished without touching what went through.
@@ -438,8 +443,11 @@ one-time setup; until it is done, its job prints what is missing and the release
   Chrome Web Store too.
 - **addons.mozilla.org** (`scripts/sign.mjs listed`). An API key from the developer hub (Tools, Manage API Keys) goes
   into the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. The first submission creates the listing with the metadata of
-  `amo/metadata.json`, and Mozilla reviews every version before it is public. `node scripts/sign.mjs unlisted` signs a
-  build for self-distribution instead; AMO numbers versions across both channels, so one version goes to one of them.
+  `amo/metadata.json`; every version carries its release notes from the changelog and the notes for Mozilla's
+  reviewers from `amo/approval-notes.txt` (what the add-on does, how to test it without an account, its permissions),
+  and leaves the listing as its authors edited it. Mozilla reviews every version before it is public.
+  `node scripts/sign.mjs unlisted` signs a build for self-distribution instead; AMO numbers versions across both
+  channels, so one version goes to one of them.
 
 | File | What it does |
 | --- | --- |

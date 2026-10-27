@@ -1,11 +1,14 @@
-// Prints the notes of a release: where the version is published and what each
-// attached package is. The release workflow writes them; the README says the
-// same at length. A store is named only when the release is sent there
-// (CWS_PUBLISH, AMO_PUBLISH set to true); CWS_EXTENSION_ID names the Chrome Web
-// Store item.
+// Prints the notes of a release: what changed (the version's section of
+// CHANGELOG.md), where the version is published and what each attached package
+// is. The release workflow writes them; the README says the same at length. A
+// store is named only when the release is sent there (CWS_PUBLISH, AMO_PUBLISH
+// set to true); CWS_EXTENSION_ID names the Chrome Web Store item.
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { changelogSection } from "./changelog.mjs";
 
-export function releaseNotes(version, env = {}) {
+export function releaseNotes(version, env = {}, changelog = "") {
   const chrome = `coddy-for-browser-chrome-${version}.zip`;
   const firefox = `coddy-for-browser-firefox-${version}.zip`;
   const stores = [
@@ -15,8 +18,10 @@ export function releaseNotes(version, env = {}) {
     env.AMO_PUBLISH === "true" && "- **Firefox:** [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)",
   ].filter(Boolean);
   const published = stores.length ? `\nThe stores publish this version once their review passes:\n\n${stores.join("\n")}\n` : "";
+  const section = changelogSection(changelog, version);
+  const changed = section ? `\n## What changed\n\n${section}\n` : "";
   return `Coddy for Browser ${version}: the extension that lets your own Coddy work in your browser.
-${published}
+${changed}${published}
 | Package | Browsers |
 | --- | --- |
 | \`${chrome}\` | Chrome, Yandex Browser and other Chromium browsers |
@@ -33,5 +38,7 @@ Then connect it to your \`coddy serve\` in the extension's settings: https://cod
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const version = process.argv[2];
   if (!version) throw new Error("usage: release-notes.mjs <version>");
-  process.stdout.write(releaseNotes(version, process.env));
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const changelog = fs.existsSync(path.join(root, "CHANGELOG.md")) ? fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8") : "";
+  process.stdout.write(releaseNotes(version, process.env, changelog));
 }

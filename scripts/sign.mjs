@@ -1,9 +1,13 @@
 // Sends the Firefox build in dist/firefox to addons.mozilla.org.
 //
 //   node scripts/sign.mjs listed     submits the version to the public
-//                                    listing, with the metadata of
-//                                    amo/metadata.json; Mozilla reviews it and
-//                                    publishes it, so nothing comes back here
+//                                    listing with its release notes (its
+//                                    section of CHANGELOG.md) and the notes for
+//                                    Mozilla's reviewers (amo/approval-notes.txt);
+//                                    the first submission also creates the
+//                                    listing from amo/metadata.json. Mozilla
+//                                    reviews it and publishes it, so nothing
+//                                    comes back here
 //   node scripts/sign.mjs unlisted   signs it for self-distribution and leaves
 //                                    dist/coddy-for-browser-firefox-<version>.xpi
 //
@@ -22,6 +26,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { GECKO_ID } from "./build.mjs";
+import { changelogSection, plainText } from "./changelog.mjs";
 
 const AMO = "https://addons.mozilla.org/api/v5";
 
@@ -41,6 +46,26 @@ export async function amoHasVersion({ fetch, issuer, secret, version, guid = GEC
   if (res.status === 404) return false;
   if (res.ok) return true;
   throw new Error(`addons.mozilla.org: HTTP ${res.status} asking about version ${version}: ${await res.text()}`);
+}
+
+// amoHasAddon says whether the listing exists already; the key's account must
+// be an author of it.
+export async function amoHasAddon({ fetch, issuer, secret, guid = GECKO_ID }) {
+  const res = await fetch(`${AMO}/addons/addon/${encodeURIComponent(guid)}/`, { headers: { Authorization: `JWT ${amoToken({ issuer, secret })}` } });
+  if (res.status === 404) return false;
+  if (res.ok) return true;
+  throw new Error(`addons.mozilla.org: HTTP ${res.status} asking about the add-on: ${await res.text()}`);
+}
+
+// amoMetadata is what a listed submission sends along with the build: the
+// version's release notes and the notes for reviewers, and for a listing that
+// does not exist yet the listing itself. A listing that exists keeps what its
+// authors edited on the site.
+export function amoMetadata({ listing, exists, releaseNotes, approvalNotes }) {
+  const version = { ...listing.version };
+  if (releaseNotes) version.release_notes = { "en-US": releaseNotes };
+  if (approvalNotes) version.approval_notes = approvalNotes;
+  return exists ? { version } : { ...listing, version };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -63,9 +88,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await fs.rm(out, { recursive: true, force: true });
   // web-ext is the version package-lock.json pins (npm ci), never a download.
   const args = ["--no-install", "web-ext", "sign", "--channel", channel, "--source-dir", source, "--artifacts-dir", out];
-  // A listed version waits for Mozilla's review, which takes longer than a
-  // workflow should; the submission is enough.
-  if (channel === "listed") args.push("--amo-metadata", path.join(root, "amo", "metadata.json"), "--approval-timeout", "0");
+  if (channel === "listed") {
+    const read = (file) => fs.readFile(path.join(root, file), "utf8").catch(() => "");
+    const metadata = amoMetadata({
+      listing: JSON.parse(await read("amo/metadata.json")),
+      exists: await amoHasAddon({ fetch, issuer, secret }),
+      releaseNotes: plainText(changelogSection(await read("CHANGELOG.md"), version)),
+      approvalNotes: (await read("amo/approval-notes.txt")).trim(),
+    });
+    const file = path.join(root, "dist", "amo-metadata.json");
+    await fs.writeFile(file, JSON.stringify(metadata, null, 2));
+    console.log(`addons.mozilla.org: version ${version} with ${metadata.version.release_notes ? "release notes" : "no release notes"} and ${metadata.version.approval_notes ? "notes for reviewers" : "no notes for reviewers"}`);
+    // A listed version waits for Mozilla's review, which takes longer than a
+    // workflow should; the submission is enough.
+    args.push("--amo-metadata", file, "--approval-timeout", "0");
+  }
   // The secret travels in the environment, not on a command line other users
   // of the machine could read.
   execFileSync("npx", args, { stdio: "inherit", env: { ...process.env, WEB_EXT_API_KEY: issuer, WEB_EXT_API_SECRET: secret } });
