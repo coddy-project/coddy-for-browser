@@ -1,6 +1,6 @@
 {
   "name": "coddy-for-browser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser extension (Chrome, Yandex Browser, Firefox) that lets a self-hosted Coddy agent work in the tabs you share with it.",
   "private": true,
   "type": "module",
