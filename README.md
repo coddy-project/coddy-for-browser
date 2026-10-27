@@ -8,9 +8,7 @@ takes screenshots and moves files, and the extension does it in the tabs you sha
 
 [Русская версия](README.ru.md)
 
-<p align="center">
-  <img src="docs/screenshots/side-panel-dark-420.png" width="360" alt="The web UI of Coddy in the side panel, next to the page it works on">
-</p>
+![Chrome with the Coddy tab group, the extension in the toolbar and a chat of Coddy in the side panel](docs/screenshots/chrome-panel-dark-1280.png)
 
 The extension talks only to the Coddy server you point it at. The model runs on that server; the extension
 executes the actions and asks you before Coddy touches a new website.
