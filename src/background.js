@@ -206,7 +206,6 @@ async function state(msg = {}) {
     chats: groups.chats(),
     pending: approvals.list(),
     allowed: approvals.grants.always,
-    local: approvals.grants.local,
     version,
   };
 }
@@ -260,9 +259,6 @@ const handlers = {
   },
   async revoke({ origin }) {
     await approvals.revoke(origin);
-  },
-  async setLocal({ on }) {
-    await approvals.setLocal(on);
   },
 };
 

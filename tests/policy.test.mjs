@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { siteOf, serverURL, socketURL, fileURL, granted, grant, revoke, isLocalOrigin, checkKey, checkName } from "../src/policy.js";
+import { siteOf, serverURL, socketURL, fileURL, granted, grant, revoke, isLocalOrigin, covers, LOCAL_SITES, checkKey, checkName } from "../src/policy.js";
 
 test("a website is its origin, scheme and port included", () => {
   assert.equal(siteOf("https://example.com/a?b#c"), "https://example.com");
@@ -41,26 +41,25 @@ test("grants are per site, always or for one chat, and revoke takes both", () =>
   assert.ok(granted("https://b.example", "s1", g));
 });
 
-test("local addresses are allowed without asking, but not the Coddy server or a chat of another machine", () => {
-  const g = { always: [], local: true, chats: {} };
+test("the local entries cover every port of this machine but the Coddy server's, and only for chats of the server", () => {
+  const g = { always: [...LOCAL_SITES], chats: {} };
   const home = "http://127.0.0.1:12345";
-  for (const origin of ["http://localhost:3000", "https://localhost:8443", "http://127.0.0.1:5173", "http://127.1.2.3:80", "http://[::1]:8080", "http://app.localhost:3000"]) {
-    assert.ok(isLocalOrigin(origin), origin);
+  for (const origin of ["http://localhost:3000", "https://localhost:8443", "http://127.0.0.1:5173", "http://[::1]:8080"])
     assert.ok(granted(origin, "s1", g, { home }), origin);
-  }
   // The web UI of the Coddy server, under any of this machine's names.
   for (const origin of [home, "http://localhost:12345", "http://[::1]:12345"]) assert.ok(!granted(origin, "s1", g, { home }), origin);
+  // ...unless the person allowed that very origin.
+  assert.ok(granted(home, "s1", { ...g, always: [...g.always, home] }, { home }));
   // A chat of another machine asks about local pages too.
   assert.ok(!granted("http://localhost:3000", "laptop/s1", g, { remote: true, home }));
-  // Not local: another host, a name that only starts like localhost.
-  for (const origin of ["http://192.168.1.10:3000", "http://localhost.example.com", "http://127.0.0.1.example.com", "https://example.com"]) {
-    assert.ok(!isLocalOrigin(origin), origin);
+  // Not this machine: another host, a name that only starts like localhost.
+  for (const origin of ["http://192.168.1.10:3000", "http://localhost.example.com", "http://127.0.0.1.example.com", "https://example.com"])
     assert.ok(!granted(origin, "s1", g, { home }), origin);
-  }
-  // Switched off, local pages ask like any other.
-  assert.ok(!granted("http://localhost:3000", "s1", { ...g, local: false }, { home }));
-  // A server on another machine leaves every local port allowed.
-  assert.ok(granted("http://localhost:12345", "s1", g, { home: "https://coddy.example.com" }));
+  // An entry revoked stops covering its host.
+  assert.ok(!granted("http://localhost:3000", "s1", revoke(g, "*://localhost:*"), { home }));
+  assert.ok(covers("*://localhost:*", "http://localhost:1"));
+  assert.ok(!covers("*://localhost:*", "not a url"));
+  assert.ok(isLocalOrigin("http://app.localhost:3000") && !isLocalOrigin("https://example.com"));
 });
 
 test("the key and the name are checked before they are kept", () => {

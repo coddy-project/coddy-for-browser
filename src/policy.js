@@ -55,17 +55,36 @@ export function isLocalOrigin(origin) {
   return host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127(\.\d{1,3}){3}$/.test(host);
 }
 
+// LOCAL_SITES start on the list of sites allowed always: this machine under
+// the names people use for it, any scheme and port. They are revoked like any
+// other entry, and the list remembers it.
+export const LOCAL_SITES = ["*://localhost:*", "*://127.0.0.1:*", "*://[::1]:*"];
+
+// covers says whether an "always" entry takes in origin: the origin itself, or
+// a "*://<host>:*" entry for every port of that host.
+export function covers(entry, origin) {
+  if (entry === origin) return true;
+  const host = /^\*:\/\/(.+):\*$/.exec(entry)?.[1];
+  if (!host) return false;
+  try {
+    return new URL(origin).hostname === host;
+  } catch {
+    return false;
+  }
+}
+
 // Grants say which websites Coddy may act on without asking: always, or for
 // the rest of one chat (until the browser restarts).
 // granted reports whether origin may be acted on for the chat. An "always"
-// covers the chats of the connected server, never a remote one, and so do
-// local addresses while grants.local is on - all but home, the Coddy server
-// itself, whose web UI a chat must not drive without the person's word.
+// covers the chats of the connected server, never a remote one. A host entry
+// leaves out home, the Coddy server itself, under every local name of its
+// port: its web UI approves a chat's own requests, so only an entry naming
+// that very origin lets a chat act there without the person's word.
 export function granted(origin, sessionId, grants, { remote = false, home = "" } = {}) {
   if ((grants.chats[sessionId] || []).includes(origin)) return true;
   if (remote) return false;
   if (grants.always.includes(origin)) return true;
-  return grants.local !== false && isLocalOrigin(origin) && !sameServer(origin, home);
+  return grants.always.some((entry) => covers(entry, origin)) && !sameServer(origin, home);
 }
 
 // sameServer says whether origin reaches the server at home: the same origin,

@@ -149,16 +149,6 @@ label {
   margin-bottom: 10px;
   font-weight: 500;
 }
-label.check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 400;
-}
-label.check input {
-  margin: 0;
-  accent-color: var(--accent);
-}
 input {
   font: inherit;
   padding: 7px 9px;

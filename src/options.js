@@ -1,5 +1,12 @@
 import { request, el, showError, statusClass } from "./ui.js";
 
+// siteLabel reads an entry of the list: an origin as it is, a host entry
+// ("*://localhost:*") as the host on any port.
+function siteLabel(entry) {
+  const host = /^\*:\/\/(.+):\*$/.exec(entry)?.[1];
+  return host ? `${host}, any port` : entry;
+}
+
 const $ = (id) => document.getElementById(id);
 let filled = false;
 let allowed = "";
@@ -22,7 +29,6 @@ async function refresh() {
   }
   $("server").textContent = s.server ? `Connected to Coddy ${s.server.version || ""}`.trim() : "";
   $("version").textContent = `Extension ${s.version}, protocol 1`;
-  $("local").checked = s.local !== false;
   const next = JSON.stringify(s.allowed);
   if (next !== allowed) {
     allowed = next;
@@ -34,7 +40,7 @@ async function refresh() {
               request({ type: "revoke", origin })
                 .then(refresh)
                 .catch(showError);
-            return el("li", {}, el("span", {}, origin), b);
+            return el("li", {}, el("span", { title: origin }, siteLabel(origin)), b);
           })
         : [el("li", { class: "muted" }, "None yet.")]),
     );
@@ -53,10 +59,6 @@ $("connect").onsubmit = async (event) => {
     showError(e);
   }
 };
-$("local").onchange = () =>
-  request({ type: "setLocal", on: $("local").checked })
-    .then(refresh)
-    .catch(showError);
 $("disconnect").onclick = () =>
   request({ type: "disconnect" })
     .then(refresh)

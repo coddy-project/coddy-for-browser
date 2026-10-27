@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Approvals } from "../src/approvals.js";
+import { LOCAL_SITES } from "../src/policy.js";
 import { memoryStore } from "./fake-chrome.mjs";
 
 async function setup(timeoutMs) {
@@ -57,7 +58,7 @@ test("decline, timeout, cancel and Stop refuse with a reason", async () => {
 test("an always grant is kept and a revoke asks again", async () => {
   const { a, store } = await setup(30);
   await a.allow("https://example.com", "s1", "always");
-  assert.deepEqual(store.peek().always, ["https://example.com"]);
+  assert.deepEqual(store.peek().always, [...LOCAL_SITES, "https://example.com"]);
   await a.ensure("https://example.com", { id: "s9" }, "click");
   await a.revoke("https://example.com");
   await assert.rejects(a.ensure("https://example.com", { id: "s9" }, "click"), (e) => e.reason === "site_prompt_timeout");
@@ -78,25 +79,28 @@ test("a site allowed always outlives the browser, a chat's answer does not", asy
   await a.load();
   await a.allow("https://always.example", "s1", "always");
   await a.allow("https://chat.example", "s1", "chat");
-  assert.deepEqual(store.peek(), { always: ["https://always.example"], local: true });
+  assert.deepEqual(store.peek().always.at(-1), "https://always.example");
+  assert.equal(store.peek().seeded, true);
   assert.deepEqual(session.peek().chats, { s1: ["https://chat.example"] });
 });
 
-test("local pages go ahead without asking until the switch is off, and the Coddy server always asks", async () => {
+test("the local entries start on the list once, and a revoked one stays revoked", async () => {
   const store = memoryStore();
   const a = new Approvals({ store, sessionStore: memoryStore(), home: () => "http://127.0.0.1:12345" });
   await a.load();
+  assert.deepEqual(store.peek(), { always: LOCAL_SITES, seeded: true });
   await a.ensure("http://localhost:5173", { id: "s1" }, "click");
   assert.equal(a.list().length, 0);
+  // The Coddy server itself asks.
   const own = a.ensure("http://localhost:12345", { id: "s1" }, "click");
   assert.equal(a.list().length, 1);
   a.cancelAll();
   await assert.rejects(own);
 
-  await a.setLocal(false);
-  assert.equal(store.peek().local, false);
+  await a.revoke("*://localhost:*");
   const b = new Approvals({ store, sessionStore: memoryStore() });
   await b.load();
+  assert.ok(!b.grants.always.includes("*://localhost:*"));
   const asked = b.ensure("http://localhost:5173", { id: "s1" }, "click");
   assert.equal(b.list().length, 1);
   b.cancelAll();

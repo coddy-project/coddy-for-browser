@@ -5,7 +5,7 @@
 // questions are asked in the browser, never in a page, and a page cannot
 // answer them.
 
-import { granted, grant, revoke } from "./policy.js";
+import { granted, grant, revoke, LOCAL_SITES } from "./policy.js";
 
 export const TIMEOUT_MS = 110000;
 
@@ -22,7 +22,7 @@ export class Approvals {
     this.sessionStore = sessionStore;
     this.onChange = onChange;
     this.timeoutMs = timeoutMs;
-    this.grants = { always: [], local: true, chats: {}, remote: [] };
+    this.grants = { always: [], chats: {}, remote: [] };
     this.pending = new Map();
     this.nextID = 1;
   }
@@ -30,19 +30,21 @@ export class Approvals {
   async load() {
     const kept = (await this.store.get()) || {};
     const session = this.sessionStore === this.store ? kept : (await this.sessionStore.get()) || {};
+    // The local sites go on the list once; a revoked one stays revoked.
+    const seeded = Boolean(kept.seeded);
     this.grants = {
-      always: kept.always || [],
-      local: kept.local !== false,
+      always: seeded ? kept.always || [] : [...new Set([...(kept.always || []), ...LOCAL_SITES])],
       chats: session.chats || {},
       remote: session.remote || [],
     };
+    if (!seeded) await this.persist();
     this.loaded = true;
   }
 
   // persist writes the grants where each kind lives.
   async persist() {
-    if (this.sessionStore === this.store) return this.store.set(this.grants);
-    await this.store.set({ always: this.grants.always, local: this.grants.local });
+    if (this.sessionStore === this.store) return this.store.set({ ...this.grants, seeded: true });
+    await this.store.set({ always: this.grants.always, seeded: true });
     await this.sessionStore.set({ chats: this.grants.chats, remote: this.grants.remote });
   }
 
@@ -144,12 +146,6 @@ export class Approvals {
     const p = this.pending.get(id);
     if (!p) throw new Error("The question was already answered or expired");
     await p.decide(choice);
-  }
-
-  // setLocal turns on or off the local addresses allowed without asking.
-  async setLocal(on) {
-    this.grants = { ...this.grants, local: Boolean(on) };
-    await this.persist();
   }
 
   async revoke(origin) {
