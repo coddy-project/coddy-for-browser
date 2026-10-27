@@ -386,7 +386,7 @@ body.panel > .error,
   display: flex;
   flex-direction: column;
 }
-#approvals {
+.stage > #approvals {
   position: absolute;
   top: 10px;
   left: 10px;
@@ -398,7 +398,7 @@ body.panel > .error,
 #approvals:empty {
   display: none;
 }
-#approvals .card {
+.stage > #approvals .card {
   margin: 0;
   /* The glass tint of the web UI over its solid ground: the chat under the
      card does not show through the text. */
