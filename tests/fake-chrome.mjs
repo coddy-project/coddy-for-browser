@@ -36,6 +36,7 @@ export function fakeChrome() {
     groupsById: groups,
     tabs: {
       onUpdated: event(),
+      onRemoved: event(),
       async query() {
         return [...tabs.values()].map((t) => ({ ...t }));
       },
@@ -77,6 +78,7 @@ export function fakeChrome() {
         tabs.delete(id);
         prune();
         calls.push(["tabs.remove", id]);
+        api.tabs.onRemoved.emit(id);
       },
       async update(id, props) {
         Object.assign(tabs.get(id), props);
@@ -112,6 +114,27 @@ export function fakeChrome() {
       },
     },
   };
+  return api;
+}
+
+// fakeAndroid is fakeChrome as Firefox for Android has it: no tab groups and
+// no groupId on a tab.
+export function fakeAndroid() {
+  const api = fakeChrome();
+  const strip = (t) => {
+    if (!t) return t;
+    const { groupId, ...rest } = t;
+    return rest;
+  };
+  const { query, get, create } = api.tabs;
+  api.tabs.query = async (q) => (await query(q)).map(strip);
+  api.tabs.get = async (id) => strip(await get(id));
+  api.tabs.create = async (props) => strip(await create(props));
+  const updated = api.tabs.onUpdated.emit;
+  api.tabs.onUpdated.emit = (id, info, tab) => updated(id, info, strip(tab));
+  delete api.tabs.group;
+  delete api.tabs.ungroup;
+  delete api.tabGroups;
   return api;
 }
 

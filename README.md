@@ -1,6 +1,6 @@
 # Coddy for Browser
 
-A browser extension for Chrome, Yandex Browser and Firefox that lets your own
+A browser extension for Chrome, Yandex Browser, Firefox and Firefox for Android that lets your own
 [Coddy](https://github.com/coddy-project/coddy-agent) agent work in the browser you use every day. Chat with Coddy in
 the side panel next to the page, or let a chat anywhere else in Coddy - the web UI, the console, an editor, Telegram,
 a scheduled job, another machine of your swarm - use your browser: it opens a tab, reads the page, clicks, types,
@@ -54,6 +54,8 @@ flowchart TB
   works in a shared tab moves it into a group of its own, and no other chat may act there. A tab Coddy opens starts
   in the chat's group. Every one of these groups is titled **Coddy** and coloured purple, and the side panel names
   the chat that holds the tab in front of you. Drag a tab out of a group, or press **Take back**, to take it back.
+  Firefox for Android has no tab groups: the extension keeps them itself, so a tab is shared and taken back with
+  **Share** and **Take back** in the panel, which names the chat that holds the page you looked at last.
 - **You approve websites.** Before the first action on a website, a small window of the extension asks: allow for
   this chat, always allow, or decline. "Always" covers the chats of the home server only: a chat from another
   machine asks for every new website. A page cannot answer these questions for you. Pages on your own machine
@@ -134,7 +136,10 @@ from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.
     side panel, so the web UI opens in a window of its own beside the browser's;
   - Firefox 140 or newer, from the Firefox package. Firefox has no debugger API for extensions, so Coddy clicks and
     types through the page: a page can tell such input from a person's, and a site that checks for it (some editors,
-    some sign-in forms) does not react.
+    some sign-in forms) does not react;
+  - Firefox for Android 142 or newer, from the Firefox package. It gives extensions no tab groups, sidebar or
+    windows, so the extension keeps the tab groups itself, and the web UI and the questions about websites open in
+    tabs; input goes through the page, as in Firefox.
 - `coddy serve` built with the `browser` and `ui` tags, with its HTTP server on. The release binaries, the Docker image
   and the packages carry them.
 - Coddy for Browser turned on in Coddy's `config.yaml`, with a key of at least 32 characters:
@@ -163,7 +168,7 @@ archive GitHub hands out is the same package as the release's (downloading an ar
 | Package | Browsers |
 | --- | --- |
 | `coddy-for-browser-chrome-<version>.zip` | Chrome, Yandex Browser and other Chromium browsers |
-| `coddy-for-browser-firefox-<version>.zip` | Firefox, unsigned |
+| `coddy-for-browser-firefox-<version>.zip` | Firefox and Firefox for Android, unsigned |
 
 ### Chrome
 
@@ -187,6 +192,21 @@ The toolbar button opens the web UI in a window of its own, placed at the right 
 
 The toolbar button opens the web UI in Firefox's sidebar.
 
+### Firefox for Android
+
+- **From addons.mozilla.org**, once the version is published there: **Add-ons** in the browser's menu.
+- **Unsigned**, for development: release Firefox for Android installs add-ons from addons.mozilla.org only, and
+  `web-ext` installs the build on a phone or an emulator over `adb`, with USB debugging on the phone and remote
+  debugging in Firefox's settings:
+
+  ```bash
+  npx web-ext run --target firefox-android --source-dir dist/firefox --android-device <adb id>
+  ```
+
+The extension's entry under **Extensions** in the browser's menu opens the web UI in a tab of its own; **Share** and
+**Take back** there act on the page you looked at last. A question about a website brings the open web UI forward, or
+opens in a tab of its own that closes once it is answered.
+
 ### From source
 
 Node.js 22 or newer, no packages to install:
@@ -195,7 +215,8 @@ Node.js 22 or newer, no packages to install:
 npm run build
 ```
 
-`dist/chrome` is the Chrome and Yandex Browser build, `dist/firefox` the Firefox one; load them as above.
+`dist/chrome` is the Chrome and Yandex Browser build, `dist/firefox` the Firefox and Firefox for Android one; load them
+as above.
 
 ## Connect
 
@@ -210,6 +231,77 @@ selects one.
 The settings page shows the connection in its corner: green while connected, amber while it connects or retries,
 grey while disconnected, red when the server refused the key or speaks another protocol version. **Disconnect** stops Coddy and closes the
 connection.
+
+### A phone with Firefox for Android
+
+The extension on a phone connects to a Coddy server the same way, in one of three setups. In each, the settings page
+opens from **Extensions** in the browser's menu (**Coddy for Browser**, then the settings button of the panel), and
+the web UI opens in a tab of its own from the same entry. Coddy keeps working with Firefox in the background, behind
+Termux or another app; a question about a website or a chat then waits in Firefox, so let Firefox show notifications
+when Android asks, and the notification tells you.
+
+**Coddy on the phone itself.** `coddy serve` runs in [Termux](https://termux.dev), and the extension connects to it
+over the phone's loopback, so nothing leaves the phone but the model calls. Install Termux (F-Droid, its GitHub
+releases or Google Play), then in Termux:
+
+```bash
+pkg install curl tmux
+curl -fsSL https://coddy.dev/install.sh | bash
+source ~/.bashrc
+```
+
+Turn the browser on in `~/.coddy/config.yaml`, next to the provider and model of
+[Configuration](https://coddy.dev/docs/getting-started/configuration):
+
+```yaml
+browser:
+  enable: true
+  token: ${CODDY_BROWSER_KEY}
+```
+
+Put `CODDY_BROWSER_KEY=<openssl rand -hex 32>` into `~/.coddy/.env`, start the server with `termux-wake-lock` and
+`tmux new -s coddy 'coddy serve'`, and enter `http://127.0.0.1:12345` and the key on the extension's settings page.
+Let Termux run unrestricted in Android's battery settings, or Android stops the server when the screen goes off
+([Android (Termux)](https://coddy.dev/docs/getting-started/android)).
+
+**Coddy on another machine.** A `coddy serve` on a laptop or a server drives the phone's browser over the network.
+The extension takes plain HTTP only for the phone's own loopback, so the server needs HTTPS: `coddy serve` has no TLS
+of its own, and a TLS-terminating proxy (Caddy, nginx) in front of its HTTP server gives it one. Enter the proxy's
+address, such as `https://coddy.example.com`, and the server's `browser.token` on the settings page. A certificate of
+a public authority works as it is. One of your own certificate authority needs two steps on the phone: install the
+authority's certificate in Android as a CA certificate (under **Encryption and credentials** in the security
+settings, named a little differently between Android versions), then turn on **Use third party CA certificates** in
+Firefox's **Secret Settings**, which appear after five taps on the Firefox logo under **Settings**, **About
+Firefox**. With
+`browser.serve_remote: true` the chats of the server's console, editors and swarm nodes reach the phone's browser
+too, and each asks on the phone first.
+
+**The phone as a node of a swarm.** Coddy in Termux joins a relay on a laptop or a server with `swarm.join`, as in
+[Android phones as swarm nodes](https://coddy.dev/docs/tutorials/swarm-android-nodes), and the extension connects to
+the phone's own `coddy serve` over loopback, as in the first setup. The phone dials the relay, so it needs no public
+address and no open port, and the relay's web UI and console drive it through that connection: a turn started there
+on the phone runs on the phone and uses its browser like any chat of the phone's server. Other machines of the swarm
+reach the phone's browser through the relay at `<relay>/swarm/nodes/<phone>/coddy/browser/v1/...` once the phone has
+`browser.serve_remote: true`, and each of their chats asks on the phone first. The phone's `~/.coddy/config.yaml`:
+
+```yaml
+httpserver:
+  enable: true
+  auth_token: ${NODE_TOKEN}
+browser:
+  enable: true
+  token: ${CODDY_BROWSER_KEY}
+  serve_remote: true
+swarm:
+  join:
+    - url: https://relay.example.com:12346
+      name: pixel
+      pairing_token: ${SWARM_PAIRING_TOKEN}
+      token: ${NODE_TOKEN}
+```
+
+On a phone a page Coddy points into or takes a picture of comes to the front first: Firefox for Android lays out and
+captures only the tab in front.
 
 ## Use it
 
@@ -256,13 +348,13 @@ A chat of another Coddy process asks first, naming the machine it runs on:
 
 | Permission | Why |
 | --- | --- |
-| `tabs`, `tabGroups` | Read the tabs in the Coddy groups, open and group tabs for a chat. Firefox has tab groups from version 139. |
+| `tabs`, `tabGroups` | Read the tabs in the Coddy groups, open and group tabs for a chat. Firefox has tab groups from version 139; Firefox for Android has none, and the extension keeps the groups itself. |
 | `scripting` | Read a page and resolve element references; show the working indicator. |
 | `debugger` | Chrome and Yandex Browser: trusted clicks, typing and keys, and screenshots through the DevTools protocol. The browser shows a bar while it is attached; the extension detaches 20 s after the last action. Firefox has no such API. |
 | `storage` | The connection settings and the websites you allowed. The key is readable only by the extension's own pages. |
 | `alarms` | Wake the service worker to reconnect after Chrome stopped it; Firefox keeps its background page running. |
 | `notifications` | Tell you that Coddy asks to use a website. |
-| `sidePanel` | Chrome: the web UI beside the page. Firefox takes a sidebar from the manifest instead, and Yandex Browser opens a window. |
+| `sidePanel` | Chrome: the web UI beside the page. Firefox takes a sidebar from the manifest instead, Yandex Browser opens a window, and Firefox for Android a tab. |
 | `localhost`, `127.0.0.1`, `[::1]` | Reach a Coddy server on this machine and act on the pages of this machine, which are on the list of sites allowed always from the start. |
 | `http://*/*`, `https://*/*`, optional | Chrome and Yandex Browser: act on a website once you allow it, and reach a Coddy server on another machine once you save its address. The browser grants each one in a prompt of its own, once; nothing beyond this machine is granted at install. Firefox holds `<all_urls>` from the install instead, which its screenshot of a tab (`tabs.captureTab`) needs; the extension still acts on web pages only, after its own question. |
 
@@ -352,12 +444,13 @@ one-time setup; until it is done, its job prints what is missing and the release
 | File | What it does |
 | --- | --- |
 | `src/background.js` | The background (a service worker in Chrome, a page in Firefox): wiring, the messages of the side panel, the approval window and the settings page. |
-| `src/platform.js` | What the browser offers: the side panel, the sidebar, the debugger. |
+| `src/platform.js` | What the browser offers: the side panel, the sidebar, the debugger, windows and tab groups. |
 | `src/panel.js`, `src/frame.js` | The side panel: the web UI in a frame, signed in by its ticket, and the bridge that gives a turn its tab and takes the web UI's theme. |
 | `src/connection.js` | The WebSocket, `initialize`, keepalive and reconnects. |
 | `src/rpc.js` | The JSON-RPC 2.0 peer. |
 | `src/commands.js` | Every action Coddy asks for, with the checks before it. |
 | `src/groups.js` | The Coddy tab groups and who holds which tab. |
+| `src/virtualgroups.js` | Tab groups the extension keeps itself where the browser has none (Firefox for Android). |
 | `src/approvals.js`, `src/policy.js` | Website approvals and address checks. |
 | `src/access.js` | The browser's own grant of websites: asked for in the click that allows one, checked before an action. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | What runs in a page, input through the DevTools protocol (Chrome) or through the page (Firefox), the working indicator. |

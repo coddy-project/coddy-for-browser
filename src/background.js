@@ -12,10 +12,15 @@ import { pageInput } from "./pageinput.js";
 import { indicator } from "./indicator.js";
 import { api, action, capabilities } from "./platform.js";
 import { hasAccess } from "./access.js";
+import { withVirtualGroups } from "./virtualgroups.js";
 import { serverURL, checkKey, checkName, isWebPage, siteEntry } from "./policy.js";
 
 const version = api.runtime.getManifest().version;
 const caps = capabilities(api);
+// tabApi is api with tab groups: the browser's own, or where it has none
+// (Firefox for Android) the extension's, through the same calls. Whatever
+// reads a tab's group goes through it.
+const tabApi = caps.tabGroups ? api : withVirtualGroups(api, storeOf("session", "virtualGroups"));
 
 function storeOf(area, key) {
   return {
@@ -29,7 +34,7 @@ let settings = { address: "", key: "", name: "", id: "", enabled: false };
 // Coddy sent before the Stop is refused whenever it arrives.
 let grant = crypto.randomUUID();
 
-const groups = new Groups(api, storeOf("session", "groups"));
+const groups = new Groups(tabApi, storeOf("session", "groups"));
 // The sites allowed always outlive the browser; what one chat was allowed
 // ends with it.
 const approvals = new Approvals({
@@ -40,13 +45,14 @@ const approvals = new Approvals({
   access: (origin) => hasAccess(api, origin),
 });
 const commands = new Commands({
-  api,
+  api: tabApi,
   groups,
   approvals,
   settings: () => settings,
   grant: () => grant,
   publish: () => publish(),
   access: (origin) => hasAccess(api, origin),
+  foreground: !caps.windows,
 });
 // Input through the debugger where the browser has it, through the page
 // where it has not (Firefox).
@@ -110,7 +116,7 @@ async function turnEnded(sessionId) {
   await groups.setWorking({ id: sessionId }, false);
   const chat = groups.state.chats[sessionId];
   if (!chat) return;
-  for (const tab of await api.tabs.query({}))
+  for (const tab of await tabApi.tabs.query({}))
     if (tab.groupId === chat.groupId)
       await api.scripting.executeScript({ target: { tabId: tab.id }, func: indicator, args: [false, ""] }).catch(() => {});
 }
@@ -126,6 +132,7 @@ let approvalWindow = null;
 async function approvalsChanged() {
   await badge();
   const pending = approvals.list();
+  if (!caps.windows) return askInTab(pending);
   // An open side panel shows the question itself.
   if (!pending.length || panels.size) return;
   // The question needs a person: a small window of the extension's own, the
@@ -141,7 +148,33 @@ async function approvalsChanged() {
     .create({ url: api.runtime.getURL("approval.html"), type: "popup", width: 420, height: 560, focused: true })
     .catch(() => null);
   approvalWindow = w?.id ?? null;
-  const first = pending[0];
+  await notify(pending[0]);
+}
+
+// panelTab is the tab of an open panel, where the panel is a tab of its own.
+function panelTab() {
+  for (const port of panels) if (port.sender?.tab?.id !== undefined) return port.sender.tab.id;
+  return null;
+}
+
+// askInTab asks where the browser has no windows (Firefox for Android): the
+// open panel comes to the front with the question, or the approval page
+// opens in a tab, which closes once nothing is left to answer.
+let approvalTab = null;
+async function askInTab(pending) {
+  if (!pending.length) {
+    if (approvalTab !== null) await api.tabs.remove(approvalTab).catch(() => {});
+    approvalTab = null;
+    return;
+  }
+  const shown = panelTab() ?? approvalTab;
+  if (shown !== null && (await api.tabs.update(shown, { active: true }).catch(() => null))) return;
+  const tab = await api.tabs.create({ url: api.runtime.getURL("approval.html"), active: true }).catch(() => null);
+  approvalTab = tab?.id ?? null;
+  await notify(pending[0]);
+}
+
+async function notify(first) {
   await api.notifications
     .create(`coddy-approval-${first.id}`, {
       type: "basic",
@@ -161,7 +194,7 @@ async function stop() {
   await approvals.forgetRemote();
   await groups.stopAll();
   await commands.input.detachAll();
-  for (const tab of await api.tabs.query({}))
+  for (const tab of await tabApi.tabs.query({}))
     await api.scripting.executeScript({ target: { tabId: tab.id }, func: indicator, args: [false, ""] }).catch(() => {});
   if (connection.connected()) {
     connection.peer.notify("browser/stop");
@@ -169,17 +202,27 @@ async function stop() {
   }
 }
 
+// recent holds the ids of the tabs brought forward, the last one first: the
+// page looked at last where a tab does not say when (Firefox for Android has
+// no lastAccessed).
+let recent = [];
+const recency = (tab) => {
+  const i = recent.indexOf(tab.id);
+  return i < 0 ? recent.length : i;
+};
+
 // currentTab is the page the person looks at in a window: its active tab, or,
 // when that is a page of the extension itself (the panel opened as a tab), the
-// web page they looked at last.
+// web page they looked at last. Without windows (Firefox for Android, where
+// every tab is a window of its own) that is any tab.
 async function currentTab(windowId) {
-  const tabs = await api.tabs.query(windowId ? { windowId } : { lastFocusedWindow: true });
+  const tabs = await tabApi.tabs.query(windowId ? { windowId } : caps.windows ? { lastFocusedWindow: true } : {});
   const active = tabs.find((t) => t.active);
   if (active && isWebPage(active.url || "")) return active;
   if (active && !active.url?.startsWith(api.runtime.getURL(""))) return active;
   return tabs
     .filter((t) => isWebPage(t.url || ""))
-    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0) || recency(a) - recency(b))[0];
 }
 
 async function state(msg = {}) {
@@ -300,21 +343,28 @@ api.runtime.onMessage.addListener((msg, sender, respond) => {
   return true;
 });
 
-api.tabs.onUpdated.addListener((id, info, tab) =>
+tabApi.tabs.onUpdated.addListener((id, info, tab) =>
   whenReady(() => {
     if (info.url || info.title || "groupId" in info || info.status === "complete")
       if (groups.ownerOf(tab) !== null || "groupId" in info) publishSoon();
   }),
 );
-api.tabs.onRemoved.addListener(() => whenReady(publishSoon));
+api.tabs.onRemoved.addListener((id) => {
+  if (id === approvalTab) approvalTab = null;
+  recent = recent.filter((t) => t !== id);
+  void whenReady(publishSoon);
+});
+api.tabs.onActivated.addListener(({ tabId }) => {
+  recent = [tabId, ...recent.filter((t) => t !== tabId)].slice(0, 100);
+});
 api.tabs.onAttached?.addListener(() => whenReady(publishSoon));
-api.tabGroups.onRemoved.addListener((group) =>
+tabApi.tabGroups.onRemoved.addListener((group) =>
   whenReady(async () => {
     await groups.groupRemoved(group.id);
     publishSoon();
   }),
 );
-api.windows.onRemoved.addListener((id) => {
+api.windows?.onRemoved.addListener((id) => {
   if (id === approvalWindow) approvalWindow = null;
   if (id === panelWindow) panelWindow = null;
 });
@@ -332,7 +382,8 @@ api.alarms.onAlarm.addListener(() =>
 
 // The toolbar button opens the web UI beside the page: the side panel in
 // Chrome, the sidebar in Firefox, a window of its own beside the browser's
-// where neither exists (Yandex Browser).
+// where neither exists (Yandex Browser), and a tab where there are no windows
+// either (Firefox for Android).
 let panelWindow = null;
 if (!caps.sidePanel) {
   action.onClicked.addListener((tab) => {
@@ -341,8 +392,16 @@ if (!caps.sidePanel) {
       void api.sidebarAction.toggle();
       return;
     }
-    void openPanelWindow(tab?.windowId);
+    void (caps.windows ? openPanelWindow(tab?.windowId) : openPanelTab());
   });
+}
+
+// openPanelTab brings the open panel forward, or opens one in a tab. Share
+// and Take back there act on the web page looked at last.
+async function openPanelTab() {
+  const open = panelTab();
+  if (open !== null && (await api.tabs.update(open, { active: true }).catch(() => null))) return;
+  await api.tabs.create({ url: api.runtime.getURL("panel.html"), active: true }).catch(() => {});
 }
 
 async function openPanelWindow(windowId) {

@@ -4,8 +4,9 @@
 //   dist/chrome    Chrome, Yandex Browser and other Chromium browsers (the
 //                  side panel where the browser has one, a window of its own
 //                  where it has not)
-//   dist/firefox   Firefox 140 and later, Manifest V2 (the sidebar, input
-//                  through the page, screenshots through tabs.captureTab)
+//   dist/firefox   Firefox 140 and later and Firefox for Android 142 and
+//                  later, Manifest V2 (the sidebar, input through the page,
+//                  screenshots through tabs.captureTab)
 //
 //   dist/coddy-for-browser-chrome-<version>.zip
 //   dist/coddy-for-browser-firefox-<version>.zip   the unsigned Firefox build;
@@ -61,6 +62,9 @@ export function manifests(m, v) {
       // user connects it to.
       data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },
     },
+    // Firefox for Android: the data collection permissions reached it in
+    // 142. The key also tells addons.mozilla.org that the add-on runs there.
+    gecko_android: { strict_min_version: "142.0" },
   };
   return { chrome, firefox };
 }

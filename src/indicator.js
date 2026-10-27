@@ -12,6 +12,7 @@ export function indicator(show, label) {
   }
   if (host) {
     host.__coddyLabel && (host.__coddyLabel.textContent = label);
+    host.__coddyFit?.();
     return true;
   }
   const root = document.createElement("div");
@@ -24,7 +25,7 @@ export function indicator(show, label) {
       box-shadow: inset 0 0 0 2px rgba(167,139,250,.95), inset 0 0 24px 4px rgba(139,92,246,.45);
       animation: pulse 2.4s ease-in-out infinite; }
     @keyframes pulse { 50% { box-shadow: inset 0 0 0 2px rgba(167,139,250,.7), inset 0 0 36px 8px rgba(139,92,246,.3); } }
-    .pill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); pointer-events: auto;
+    .pill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); transform-origin: 50% 100%; pointer-events: auto;
       display: flex; gap: 10px; align-items: center; padding: 7px 8px 7px 14px; border-radius: 999px;
       font: 500 13px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; color: #f5f3ff;
       background: rgba(16,16,20,.92); box-shadow: 0 6px 24px rgba(0,0,0,.35); }
@@ -45,7 +46,16 @@ export function indicator(show, label) {
   });
   pill.append(text, stop);
   shadow.append(style, glow, pill);
+  // A phone shows a page laid out wider than its screen zoomed out (Firefox
+  // for Android): the pill keeps its size on the screen, and Stop stays a
+  // button a finger hits.
+  const fit = () => {
+    pill.style.transform = `translateX(-50%) scale(${1 / (globalThis.visualViewport?.scale || 1)})`;
+  };
+  fit();
+  globalThis.visualViewport?.addEventListener("resize", fit);
   root.__coddyLabel = text;
+  root.__coddyFit = fit;
   document.documentElement.append(root);
   return true;
 }
