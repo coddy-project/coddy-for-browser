@@ -15,7 +15,7 @@ async function refresh() {
   $("status").textContent = s.status;
   $("status").className = "status " + statusClass(s.status);
   if (!filled) {
-    $("address").value = s.settings.address || "http://127.0.0.1:12348";
+    $("address").value = s.settings.address || "http://127.0.0.1:12345";
     $("name").value = s.settings.name || "";
     $("key").placeholder = s.settings.keySet ? "Keep the current key" : "browser.token of the server";
     filled = true;

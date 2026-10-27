@@ -1,13 +1,66 @@
-// A stand-in for Coddy's browser listener, enough to drive the real extension
+// A stand-in for the HTTP server of Coddy, enough to drive the real extension
 // in a real Chromium: the WebSocket endpoint speaking the protocol, the file
-// transfer route, and a few fixture pages. Node alone - the WebSocket server
-// below implements the part of RFC 6455 the extension uses (text frames,
-// close, ping).
+// transfer route, a few fixture pages, and a web UI that plays the real one's
+// part in the side panel (the ticket sign-in, the theme, the tab of a turn).
+// Node alone - the WebSocket server below implements the part of RFC 6455 the
+// extension uses (text frames, close, ping).
 
 import http from "node:http";
 import crypto from "node:crypto";
 
 const GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+const body = (req) =>
+  new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+
+// WEB_UI is the part of Coddy's web UI the side panel relies on, in the same
+// messages: the sign-in by the ticket, the theme, the tab of a turn.
+const WEB_UI = `<!doctype html><title>Coddy</title>
+<style>body{margin:0;padding:16px;background:#0f0f10;color:#fff;font:14px system-ui}textarea{display:block;width:100%;height:60px}</style>
+<p id="who">Signing in</p>
+<textarea id="composer" aria-label="Message"></textarea>
+<button id="send">Send</button>
+<p id="answer"></p>
+<script>
+const q = new URLSearchParams(location.search);
+const origin = q.get("coddy_panel_origin");
+fetch("/mock/signin", { method: "POST", body: q.get("coddy_panel") || "" })
+  .then((r) => r.text())
+  .then((t) => (document.getElementById("who").textContent = t));
+parent.postMessage({ source: "coddy-web-ui", type: "theme", theme: {
+  scheme: "dark", bg: "rgb(15, 15, 16)", surface: "rgba(14, 14, 18, 0.62)", border: "rgba(255, 255, 255, 0.12)",
+  text: "rgb(255, 255, 255)", muted: "rgb(156, 163, 175)", accent: "rgb(147, 51, 234)" } }, origin);
+let n = 0;
+// A run that cannot reach into the frame (Firefox over BiDi) hands it the
+// next message through the server and reads the answer back from it.
+setInterval(async () => {
+  const next = await (await fetch("/mock/next")).text();
+  if (!next) return;
+  document.getElementById("composer").value = next;
+  document.getElementById("send").click();
+}, 200);
+document.getElementById("send").onclick = () => {
+  const requestId = "turn-" + ++n;
+  const text = document.getElementById("composer").value;
+  const sessionId = "sess_panel_1";
+  addEventListener("message", function answered(ev) {
+    const m = ev.data;
+    if (ev.source !== parent || ev.origin !== origin || !m || m.source !== "coddy-for-browser" || m.requestId !== requestId) return;
+    removeEventListener("message", answered);
+    fetch("/mock/turn", { method: "POST", body: JSON.stringify({ text, sessionId, tab: m.tab }) })
+      .then((r) => r.text())
+      .then((a) => {
+        document.getElementById("answer").textContent = a;
+        fetch("/mock/answer", { method: "POST", body: a });
+      });
+  });
+  parent.postMessage({ source: "coddy-web-ui", type: "turn", requestId, sessionId, title: text }, origin);
+};
+</script>`;
 
 function frame(text) {
   const payload = Buffer.from(text);
@@ -88,9 +141,21 @@ class Socket {
 // startMockCoddy serves the listener on a free loopback port. It records what
 // the extension sent and lets a test send commands.
 export async function startMockCoddy({ key }) {
-  const state = { socket: null, tabs: [], stops: 0, notes: [], pending: new Map(), files: new Map(), nextID: 1, ready: null };
+  const state = {
+    socket: null,
+    tabs: [],
+    stops: 0,
+    notes: [],
+    pending: new Map(),
+    files: new Map(),
+    tickets: new Set(),
+    signins: 0,
+    nextID: 1,
+    ready: null,
+  };
   let resolveReady;
   state.ready = new Promise((r) => (resolveReady = r));
+  let api;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://x");
     if (url.pathname.startsWith("/browser/v1/files/")) {
@@ -128,57 +193,55 @@ export async function startMockCoddy({ key }) {
 <div style="height:3000px"></div>`);
     }
     if (url.pathname === "/download") return res.writeHead(200).end("download fixture");
+    // The web UI as the side panel loads it: signed in by the ticket of the
+    // address, it reports its theme and asks the panel for the tab of a turn.
+    if (url.pathname === "/") {
+      res.writeHead(200, { "content-type": "text/html" });
+      return res.end(WEB_UI);
+    }
+    if (url.pathname === "/mock/next") {
+      const next = state.next || "";
+      state.next = "";
+      return res.writeHead(200).end(next);
+    }
+    if (url.pathname === "/mock/answer" && req.method === "POST") {
+      return body(req).then((a) => {
+        state.answer = a.toString();
+        res.writeHead(204).end();
+      });
+    }
+    if (url.pathname === "/mock/signin" && req.method === "POST") {
+      return body(req).then((ticket) => {
+        const ok = state.tickets.delete(ticket.toString());
+        if (ok) state.signins++;
+        res.writeHead(ok ? 200 : 401).end(ok ? "Signed in" : "Refused");
+      });
+    }
+    if (url.pathname === "/mock/turn" && req.method === "POST") {
+      return body(req).then(async (raw) => {
+        // Coddy's side of the turn: the browser tool reads the tab the
+        // person writes from, the default tab of the panel's chat.
+        const turn = JSON.parse(raw.toString());
+        state.turn = turn;
+        try {
+          const page = await api.command("snapshot", { tabId: turn.tab.tab_id, session: { id: turn.sessionId, title: turn.text } });
+          res.writeHead(200).end(`The page is ${page.title}.`);
+        } catch (e) {
+          res.writeHead(200).end(`Failed: ${e.message}`);
+        }
+      });
+    }
     res.writeHead(404).end();
   });
-  // chatRequest plays Coddy's side of the side panel's chat: a chat/send
-  // runs a scripted turn that asks the panel for a permission, reads the tab
-  // the person wrote from, and answers.
-  const answer = (socket, id, result) => socket.send(JSON.stringify({ jsonrpc: "2.0", id, result }));
-  state.chats = [];
-  async function chatRequest(socket, msg) {
-    const p = msg.params || {};
-    if (msg.method === "chat/new") {
-      const sessionId = `sess_mock_${state.chats.length + 1}`;
-      const permissionMode = p.permissionMode || "ask";
-      state.chats.push({ sessionId, title: "", messages: [], permissionMode });
-      return answer(socket, msg.id, { sessionId, permissionMode });
+  // serverRequest answers what the extension asks of Coddy: panel/open, a
+  // one-time ticket that signs the side panel's web UI in.
+  async function serverRequest(socket, msg) {
+    if (msg.method === "panel/open") {
+      const ticket = crypto.randomBytes(32).toString("hex");
+      state.tickets.add(ticket);
+      return socket.send(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { ticket } }));
     }
-    if (msg.method === "chat/mode") {
-      const chat = state.chats.find((c) => c.sessionId === p.sessionId);
-      chat.permissionMode = p.permissionMode;
-      return answer(socket, msg.id, { permissionMode: p.permissionMode });
-    }
-    if (msg.method === "chat/list")
-      return answer(socket, msg.id, { chats: state.chats.filter((c) => c.messages.length).map(({ sessionId, title }) => ({ sessionId, title })) });
-    if (msg.method === "chat/messages")
-      return answer(socket, msg.id, {
-        messages: state.chats.find((c) => c.sessionId === p.sessionId)?.messages || [],
-        permissionMode: state.chats.find((c) => c.sessionId === p.sessionId)?.permissionMode || "ask",
-      });
-    if (msg.method !== "chat/send")
-      return socket.send(JSON.stringify({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "method not found" } }));
-    const chat = state.chats.find((c) => c.sessionId === p.sessionId);
-    state.sent = p;
-    const update = (u) => socket.send(JSON.stringify({ jsonrpc: "2.0", method: "chat/update", params: { sessionId: p.sessionId, ...u } }));
-    update({ kind: "tool", toolCallId: "t1", title: "browser", status: "pending" });
-    const allowed = await coddyAsk("chat/permission", {
-      sessionId: p.sessionId,
-      title: "browser",
-      detail: JSON.stringify({ action: "snapshot", tab_id: p.tab?.id }),
-      options: [
-        { optionId: "allow", name: "Allow", kind: "allow_once" },
-        { optionId: "reject", name: "Reject", kind: "reject_once" },
-      ],
-    }).catch(() => ({}));
-    state.permission = allowed.optionId;
-    let page = {};
-    if (allowed.optionId === "allow") page = await api.command("snapshot", { tabId: p.tab.id, session: { id: p.sessionId, title: "Read the page" } });
-    update({ kind: "tool", toolCallId: "t1", status: "completed" });
-    const text = `The page is **${page.title}**.`;
-    for (const piece of [text.slice(0, 9), text.slice(9)]) update({ kind: "text", text: piece });
-    chat.title = "Read the page";
-    chat.messages.push({ role: "user", text: p.text }, { role: "assistant", text });
-    answer(socket, msg.id, { stopReason: "end_turn" });
+    socket.send(JSON.stringify({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "method not found" } }));
   }
   function coddyAsk(method, params) {
     const id = crypto.randomBytes(24).toString("hex");
@@ -191,7 +254,7 @@ export async function startMockCoddy({ key }) {
   server.on("upgrade", (req, raw) => {
     const url = new URL(req.url, "http://x");
     const origin = req.headers.origin || "";
-    if (url.pathname !== "/browser/v1/connect" || !origin.startsWith("chrome-extension://")) {
+    if (url.pathname !== "/browser/v1/connect" || !/^(chrome|moz)-extension:\/\//.test(origin)) {
       raw.end("HTTP/1.1 403 Forbidden\r\n\r\n");
       return;
     }
@@ -226,7 +289,7 @@ export async function startMockCoddy({ key }) {
           return;
         }
         if (msg.method === "browser/stop") return void state.stops++;
-        if (msg.method && msg.id !== undefined) return void chatRequest(socket, msg);
+        if (msg.method && msg.id !== undefined) return void serverRequest(socket, msg);
         if (msg.method) return void state.notes.push(msg.method);
         const p = state.pending.get(msg.id);
         if (p) {
@@ -240,12 +303,17 @@ export async function startMockCoddy({ key }) {
     );
   });
   // CODDY_MOCK_PORT pins the port, for screenshots that show the default
-  // address of the listener.
+  // address of the server.
   await new Promise((r) => server.listen(Number(process.env.CODDY_MOCK_PORT) || 0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const api = {
+  api = {
     base,
     state,
+    // send has the web UI in the panel's frame send a message, as a person
+    // typing it would.
+    send(text) {
+      state.next = text;
+    },
     // command sends browser/command and resolves with its answer.
     command(action, { tabId, params = {}, session = { id: "sess_e2e", title: "E2E chat" } } = {}) {
       const id = crypto.randomBytes(24).toString("hex");

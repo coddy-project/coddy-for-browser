@@ -47,7 +47,7 @@ test("a tab a chat opens starts in its group, and release hands its tabs back", 
   assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, chatTitle({ id: "sess_a" }));
   const second = await groups.open("https://example.org/2", { id: "sess_a" });
   assert.equal(api.tabsById.get(second.id).groupId, api.tabsById.get(tab.id).groupId);
-  assert.equal(await groups.release("sess_a"), 2);
+  assert.equal((await groups.release("sess_a")).length, 2);
   for (const t of await groups.tabs()) assert.equal(t.sessionId, undefined);
   assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, SHARED_TITLE);
 });
@@ -90,6 +90,22 @@ test("groups the user closed are forgotten, and the bookkeeping survives a reloa
 test("a long chat title is shortened and a missing one falls back to the id", () => {
   assert.equal(chatTitle({ id: "sess_0123456789", title: "x".repeat(40) }).length, 30);
   assert.equal(chatTitle({ id: "sess_0123456789" }), "Coddy 456789");
+});
+
+test("a chat of another Coddy keeps its machine in the group's title, however long its own", () => {
+  const title = chatTitle({ id: "laptop/sess_1", title: "x".repeat(40), node: "laptop" });
+  assert.ok(title.endsWith(" (laptop)"), title);
+  assert.ok(title.length <= 30, title);
+});
+
+test("changes of the groups run one at a time, so Stop catches a tab being opened", async () => {
+  const { api, groups } = await setup();
+  const opening = groups.open("https://example.org/", { id: "sess_a" });
+  const stopping = groups.stopAll();
+  const tab = await opening;
+  await stopping;
+  assert.equal(api.tabsById.get(tab.id).groupId, -1);
+  assert.deepEqual(groups.state.chats, {});
 });
 
 test("the tab the person writes from goes into the panel chat's group, from any group", async () => {

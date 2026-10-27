@@ -1,4 +1,4 @@
-// The one WebSocket to Coddy's browser listener. The extension dials out and
+// The one WebSocket to the HTTP server of Coddy. The extension dials out and
 // keeps it open; Coddy's requests come down it. initialize goes first, with
 // the key, because a browser cannot set headers on a WebSocket.
 
@@ -31,6 +31,17 @@ export class Connection {
     this.peer = null;
     this.timers = [];
     this.generation = 0;
+    // fatal is why the server refused the extension for good (a wrong key,
+    // another protocol version); retrying is set while the next attempt is
+    // scheduled. The keepalive alarm dials again only when neither holds.
+    this.fatal = "";
+    this.retrying = false;
+  }
+
+  // idle reports whether nothing would dial again by itself: no socket, no
+  // refusal a retry cannot fix, no attempt scheduled.
+  idle() {
+    return !this.socket && !this.fatal && !this.retrying;
   }
 
   setStatus(status) {
@@ -66,6 +77,8 @@ export class Connection {
   // connect (re)opens the socket with the current settings.
   connect() {
     this.close();
+    this.fatal = "";
+    this.retrying = false;
     const s = this.settings();
     if (!s.enabled) return;
     let url;
@@ -134,12 +147,19 @@ export class Connection {
       this.clearTimers();
       this.onClosed?.();
       if (fatal) {
+        this.fatal = fatal;
         this.setStatus(fatal);
         return;
       }
       const wait = backoff(this.attempt++);
       this.setStatus(`Disconnected; retrying in ${Math.ceil(wait / 1000)} s`);
-      this.timers.push(setTimeout(() => this.connect(), wait));
+      this.retrying = true;
+      this.timers.push(
+        setTimeout(() => {
+          this.retrying = false;
+          this.connect();
+        }, wait),
+      );
     };
   }
 }

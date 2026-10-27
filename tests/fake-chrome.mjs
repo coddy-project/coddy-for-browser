@@ -127,6 +127,15 @@ export function fakeDebugger(frameURL = () => "https://example.com/") {
       if (method === "Page.getLayoutMetrics")
         return { cssLayoutViewport: { pageX: 0, pageY: 0, clientWidth: 800, clientHeight: 600 } };
       if (method === "Page.captureScreenshot") return { data: "iVBORw0KGgo=" };
+      if (method === "Page.getNavigationHistory")
+        return {
+          currentIndex: 1,
+          entries: [
+            { id: 1, url: "https://back.example.net/" },
+            { id: 2, url: frameURL(tabId) },
+            { id: 3, url: "https://forward.example.org/" },
+          ],
+        };
       return {};
     },
     async detachAll() {},

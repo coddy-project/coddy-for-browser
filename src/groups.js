@@ -1,5 +1,6 @@
-// Tabs Coddy may reach live in Chrome tab groups, so the user sees them in the
-// tab strip and moves them by dragging:
+// Tabs Coddy may reach live in the browser's tab groups (Chrome, Yandex
+// Browser, Firefox 139 and later), so the user sees them in the tab strip and
+// moves them by dragging:
 // - the shared "Coddy" group holds the tabs the user shares; any chat may
 //   take one;
 // - every chat that works in the browser has a group of its own, titled after
@@ -21,10 +22,14 @@ export function colorFor(sessionId) {
   return PALETTE[h % PALETTE.length];
 }
 
+// chatTitle names a chat's group: its title cut to fit the tab strip, and
+// for a chat of another Coddy the machine it runs on, which is never cut off.
 export function chatTitle(session) {
+  const node = session?.node ? ` (${String(session.node).slice(0, 20)})` : "";
+  const room = 30 - node.length;
   const title = String(session?.title || "").trim();
-  if (title) return title.length > 30 ? title.slice(0, 29) + "…" : title;
-  return "Coddy " + String(session?.id || "").slice(-6);
+  if (title) return (title.length > room ? title.slice(0, room - 1) + "…" : title) + node;
+  return "Coddy " + String(session?.id || "").slice(-6) + node;
 }
 
 export class Groups {
@@ -34,6 +39,16 @@ export class Groups {
     this.store = store;
     this.state = { shared: null, chats: {} };
     this.working = new Set();
+    this.queue = Promise.resolve();
+  }
+
+  // run makes one change of the groups at a time: Stop waits for a tab
+  // being opened, so the tab is ungrouped too, and two chats cannot both
+  // take the same shared tab.
+  run(fn) {
+    const p = this.queue.then(fn);
+    this.queue = p.catch(() => {});
+    return p;
   }
 
   async load() {
@@ -80,6 +95,10 @@ export class Groups {
   }
 
   groupRemoved(groupId) {
+    return this.run(() => this._groupRemoved(groupId));
+  }
+
+  _groupRemoved(groupId) {
     if (this.state.shared === groupId) this.state.shared = null;
     for (const [sessionId, chat] of Object.entries(this.state.chats))
       if (chat.groupId === groupId) delete this.state.chats[sessionId];
@@ -89,7 +108,7 @@ export class Groups {
   // tabs is what the extension reports to Coddy: every web page in a Coddy
   // group, with the chat that holds it.
   async tabs() {
-    await this.forgetMissing();
+    await this.run(() => this.forgetMissing());
     const out = [];
     for (const tab of await this.api.tabs.query({})) {
       const owner = this.ownerOf(tab);
@@ -119,14 +138,22 @@ export class Groups {
   }
 
   // share is the user handing a tab to Coddy: into the shared group.
-  async share(tabId) {
+  share(tabId) {
+    return this.run(() => this._share(tabId));
+  }
+
+  async _share(tabId) {
     const tab = await this.api.tabs.get(tabId);
     if (!isWebPage(tab.url || "")) throw new Error("Only ordinary web pages can be shared");
     await this.sharedGroup(tab.windowId, tabId);
   }
 
   // unshare takes a tab out of every Coddy group; it stays open.
-  async unshare(tabId) {
+  unshare(tabId) {
+    return this.run(() => this._unshare(tabId));
+  }
+
+  async _unshare(tabId) {
     await this.api.tabs.ungroup([tabId]);
   }
 
@@ -152,7 +179,11 @@ export class Groups {
 
   // claim moves a tab the chat may take into the chat's group: a shared tab,
   // or one already its own. Anything else is refused.
-  async claim(tabId, session) {
+  claim(tabId, session) {
+    return this.run(() => this._claim(tabId, session));
+  }
+
+  async _claim(tabId, session) {
     const tab = await this.api.tabs.get(tabId);
     const owner = this.ownerOf(tab);
     if (owner === null) {
@@ -172,7 +203,11 @@ export class Groups {
 
   // adopt is the person giving a tab to a chat of the side panel: the tab
   // they write from goes into the chat's group whatever group it was in.
-  async adopt(tabId, session) {
+  adopt(tabId, session) {
+    return this.run(() => this._adopt(tabId, session));
+  }
+
+  async _adopt(tabId, session) {
     const tab = await this.api.tabs.get(tabId);
     if (!isWebPage(tab.url || "")) throw new Error("Only ordinary web pages can be given to Coddy");
     if (this.ownerOf(tab) === session.id) {
@@ -184,7 +219,11 @@ export class Groups {
   }
 
   // open creates a tab for the chat, in its group, without taking focus.
-  async open(url, session) {
+  open(url, session) {
+    return this.run(() => this._open(url, session));
+  }
+
+  async _open(url, session) {
     const chat = this.state.chats[session.id];
     let windowId;
     if (chat) {
@@ -197,21 +236,30 @@ export class Groups {
     return tab;
   }
 
-  // release hands the chat's tabs back to the shared group.
-  async release(sessionId) {
+  // release hands the chat's tabs back to the shared group and answers their
+  // ids.
+  release(sessionId) {
+    return this.run(() => this._release(sessionId));
+  }
+
+  async _release(sessionId) {
     const chat = this.state.chats[sessionId];
-    if (!chat) return 0;
+    if (!chat) return [];
     const tabs = (await this.api.tabs.query({})).filter((t) => t.groupId === chat.groupId);
     delete this.state.chats[sessionId];
     this.working.delete(sessionId);
     for (const tab of tabs) await this.sharedGroup(tab.windowId, tab.id);
     await this.save();
-    return tabs.length;
+    return tabs.map((t) => t.id);
   }
 
   // stopAll is the user's Stop: every Coddy group is dissolved and every tab
   // stays open outside them.
-  async stopAll() {
+  stopAll() {
+    return this.run(() => this._stopAll());
+  }
+
+  async _stopAll() {
     const managed = (await this.api.tabs.query({})).filter((t) => this.ownerOf(t) !== null).map((t) => t.id);
     this.state = { shared: null, chats: {} };
     this.working.clear();

@@ -76,6 +76,8 @@ test("a refused key is final: no reconnect loop", async () => {
   await tick();
   await tick();
   assert.equal(c.status, "Coddy refused the extension key");
+  // The keepalive alarm does not dial a server that refused the key.
+  assert.equal(c.idle(), false);
   assert.equal(c.timers.length, 0);
 });
 
@@ -90,6 +92,8 @@ test("a lost socket is dialled again after a backoff", async () => {
   await tick();
   assert.match(c.status, /retrying in/);
   assert.equal(c.timers.length, 1);
+  // The keepalive alarm leaves a scheduled attempt to its backoff.
+  assert.equal(c.idle(), false);
   c.close();
 });
 

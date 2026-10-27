@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { Commands } from "../src/commands.js";
 import { Groups } from "../src/groups.js";
 import { Approvals } from "../src/approvals.js";
+import { cdpInput } from "../src/input.js";
+import { pageInput } from "../src/pageinput.js";
 import { fakeChrome, fakeDebugger, memoryStore } from "./fake-chrome.mjs";
 
 async function setup({ allow = ["https://example.com", "https://example.org"] } = {}) {
@@ -19,7 +21,7 @@ async function setup({ allow = ["https://example.com", "https://example.org"] } 
     api,
     groups,
     approvals,
-    dbg,
+    input: cdpInput(dbg),
     settings: () => ({ address: "http://127.0.0.1:12348", key: "k".repeat(32) }),
     grant: () => grant.value,
     publish: async () => void published++,
@@ -134,8 +136,8 @@ test("files move through the listener's one-time tickets with the key", async ()
   await assert.rejects(commands.handle(cmd("upload_file", tab.id, { ref: "n:1", transfer_id: "../x" })));
 });
 
-test("navigate to another site asks about that site too", async () => {
-  const { api, groups, commands, approvals } = await setup({ allow: ["https://example.com"] });
+test("navigate to another site asks about that site too, back and forward included", async () => {
+  const { api, groups, commands, approvals, dbg } = await setup({ allow: ["https://example.com"] });
   const tab = await groups.open("https://example.com/", chat);
   const going = commands.handle(cmd("navigate", tab.id, { url: "https://other.example/" }));
   await new Promise((r) => setTimeout(r, 5));
@@ -143,9 +145,91 @@ test("navigate to another site asks about that site too", async () => {
   await approvals.decide(approvals.list()[0].id, "deny");
   await assert.rejects(going, (e) => e.reason === "site_declined");
   assert.equal(api.tabsById.get(tab.id).url, "https://example.com/");
-  const back = await commands.handle(cmd("navigate", tab.id, { url: "back" }));
-  assert.equal(back.url, "https://example.com/");
-  assert.ok(api.calls.some((c) => c[0] === "tabs.goBack"));
+  // The page back is on another site: the question comes first, then the
+  // step through the debugger.
+  const send = dbg.send;
+  dbg.send = async (tabId, method, params, expected) => {
+    const r = await send(tabId, method, params, expected);
+    if (method === "Page.navigateToHistoryEntry") {
+      const t = api.tabsById.get(tabId);
+      t.url = "https://back.example.net/";
+      api.tabs.onUpdated.emit(tabId, { status: "complete" }, { ...t });
+    }
+    return r;
+  };
+  const back = commands.handle(cmd("navigate", tab.id, { url: "back" }));
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(approvals.list()[0].origin, "https://back.example.net");
+  await approvals.decide(approvals.list()[0].id, "chat");
+  assert.equal((await back).url, "https://back.example.net/");
+  assert.ok(dbg.sent.some(([, m, p]) => m === "Page.navigateToHistoryEntry" && p.entryId === 1));
+});
+
+test("Stop reaches a tab being opened: it ends outside every group and the command fails", async () => {
+  const { api, groups, commands, grant } = await setup();
+  const opening = commands.handle(cmd("open_tab", 0, { url: "https://example.org/" }));
+  await new Promise((r) => setTimeout(r, 0));
+  grant.value = "g2";
+  await groups.stopAll();
+  await assert.rejects(opening, (e) => e.reason === "stopped");
+  for (const tab of api.tabsById.values()) assert.equal(tab.groupId, -1);
+});
+
+test("a tab taken back while its question waited is not navigated", async () => {
+  const { api, groups, commands, approvals } = await setup({ allow: ["https://example.com"] });
+  const tab = await groups.open("https://example.com/", chat);
+  const going = commands.handle(cmd("navigate", tab.id, { url: "https://bank.example.net/" }));
+  await new Promise((r) => setTimeout(r, 5));
+  await groups.unshare(tab.id);
+  await approvals.decide(approvals.list()[0].id, "chat");
+  await assert.rejects(going, (e) => e.reason === "page_changed");
+  assert.equal(api.tabsById.get(tab.id).url, "https://example.com/");
+});
+
+test("a declined site hands a shared tab back to the shared group", async () => {
+  const { api, groups, commands, approvals } = await setup({ allow: [] });
+  const tab = api.addTab("https://example.com/");
+  await groups.share(tab.id);
+  const asking = commands.handle(cmd("snapshot", tab.id));
+  await new Promise((r) => setTimeout(r, 5));
+  await approvals.decide(approvals.list()[0].id, "deny");
+  await assert.rejects(asking, (e) => e.reason === "site_declined");
+  assert.equal(groups.ownerOf(api.tabsById.get(tab.id)), "");
+});
+
+test("input aimed at a frame of another website is refused", async () => {
+  const { api, groups, commands, dbg } = await setup();
+  const tab = api.addTab("https://example.com/");
+  await groups.share(tab.id);
+  api.scripting.results["pageAction:hit"] = { crossOrigin: true };
+  await assert.rejects(commands.handle(cmd("click", tab.id, { x: 10, y: 10 })), (e) => e.reason === "cross_origin_frame");
+  assert.ok(!dbg.sent.some(([, m]) => m === "Input.dispatchMouseEvent"));
+});
+
+test("without the debugger, input and screenshots go through the page", async () => {
+  const { api, groups, commands } = await setup();
+  const captured = [];
+  api.tabs.captureTab = async (tabId, opts) => (captured.push([tabId, opts]), "data:image/png;base64,iVBORw0KGgo=");
+  commands.input = pageInput(api, (tabId, action, params) => commands.script(tabId, action, params));
+  api.scripting.results["pageAction:input"] = (p) => ({ ok: true, trusted: false, kind: p.kind, origin: p.expected_origin });
+  const tab = api.addTab("https://example.com/");
+  await groups.share(tab.id);
+  const clicked = await commands.handle(cmd("click", tab.id, { x: 5, y: 6 }));
+  assert.equal(clicked.kind, "click");
+  assert.equal(clicked.trusted, false);
+  assert.equal(clicked.origin, "https://example.com");
+  const shot = await commands.handle(cmd("screenshot", tab.id));
+  assert.match(shot.dataUrl, /^data:image\/png;base64,/);
+  assert.deepEqual(captured, [[tab.id, { format: "png", scale: 0.5 }]]);
+});
+
+test("release takes the working marks off the tabs it hands back", async () => {
+  const { api, groups, commands } = await setup();
+  const tab = await groups.open("https://example.com/", chat);
+  await commands.handle(cmd("snapshot", tab.id));
+  api.calls.length = 0;
+  await commands.handle(cmd("release", 0));
+  assert.ok(api.calls.some((c) => c[0] === "executeScript" && c[1] === tab.id && c[2] === "indicator" && c[3] === false));
 });
 
 test("release and close_tab act on the chat's own tabs", async () => {
@@ -156,4 +240,50 @@ test("release and close_tab act on the chat's own tabs", async () => {
   assert.ok(!api.tabsById.has(one.id));
   assert.deepEqual(await commands.handle(cmd("release", 0)), { released: 1 });
   for (const t of await groups.tabs()) assert.equal(t.sessionId, undefined);
+});
+
+test("a chat of another Coddy is asked about once, and an always-allowed site still asks for it", async () => {
+  const { api, groups, commands, approvals } = await setup();
+  const tab = api.addTab("https://example.com/");
+  await groups.share(tab.id);
+  const remote = { id: "laptop/sess_r", title: "Trip", node: "laptop" };
+  const first = commands.handle(cmd("snapshot", tab.id, {}, remote));
+  await new Promise((r) => setTimeout(r, 5));
+  let [q] = approvals.list();
+  assert.equal(q.kind, "chat");
+  assert.deepEqual(q.session, { id: "laptop/sess_r", title: "Trip", node: "laptop" });
+  await approvals.decide(q.id, "chat");
+  // example.com is always allowed, but not for a chat of another Coddy.
+  await new Promise((r) => setTimeout(r, 5));
+  [q] = approvals.list();
+  assert.equal(q.kind, "site");
+  assert.equal(q.origin, "https://example.com");
+  await approvals.decide(q.id, "always");
+  const result = await first;
+  assert.equal(result.text, "Hello");
+  assert.equal(groups.ownerOf(api.tabsById.get(tab.id)), "laptop/sess_r");
+  // Allowed for that chat only: the next action asks nothing, and the
+  // "always" it chose did not become one for every chat.
+  await commands.handle(cmd("snapshot", tab.id, {}, remote));
+  assert.equal(approvals.list().length, 0);
+  assert.ok(!approvals.allowed("https://example.com", { id: "laptop/sess_other", node: "laptop" }));
+});
+
+test("a declined chat of another Coddy reaches nothing, and Stop takes its approval back", async () => {
+  const { api, groups, commands, approvals } = await setup();
+  const tab = api.addTab("https://example.com/");
+  await groups.share(tab.id);
+  const remote = { id: "laptop/sess_d", title: "Mail", node: "laptop" };
+  const declined = commands.handle(cmd("snapshot", tab.id, {}, remote));
+  await new Promise((r) => setTimeout(r, 5));
+  await approvals.decide(approvals.list()[0].id, "deny");
+  await assert.rejects(declined, (e) => e.reason === "chat_declined");
+  const asked = approvals.ensureChat({ id: "laptop/sess_ok", node: "laptop" });
+  await approvals.decide(approvals.list()[0].id, "chat");
+  await asked;
+  assert.ok(approvals.chatAllowed({ id: "laptop/sess_ok", node: "laptop" }));
+  await approvals.forgetRemote();
+  assert.ok(!approvals.chatAllowed({ id: "laptop/sess_ok", node: "laptop" }));
+  // A chat of the connected server never asks.
+  assert.ok(approvals.chatAllowed({ id: "sess_local" }));
 });

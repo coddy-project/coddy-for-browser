@@ -1,7 +1,7 @@
 {
   "name": "coddy-for-browser",
   "version": "0.1.0",
-  "description": "Chrome extension that lets a self-hosted Coddy agent work in the tabs you share with it.",
+  "description": "Browser extension (Chrome, Yandex Browser, Firefox) that lets a self-hosted Coddy agent work in the tabs you share with it.",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -11,6 +11,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test --test-timeout=30000 tests/*.test.mjs",
-    "e2e": "node tests/e2e/run.mjs"
+    "e2e": "node tests/e2e/run.mjs",
+    "e2e:firefox": "node tests/e2e/firefox.mjs"
   }
 }

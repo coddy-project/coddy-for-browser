@@ -1,18 +1,20 @@
-// The service worker: the connection to Coddy, the tab groups, the website
-// approvals, the commands, the side panel's chat, and the messages of the
-// extension's own pages.
+// The background of the extension - a service worker in Chrome and Yandex
+// Browser, an event page in Firefox: the connection to Coddy, the tab groups,
+// the website approvals, the commands, and the messages of the extension's
+// own pages, the side panel among them.
 
 import { Connection } from "./connection.js";
 import { Groups } from "./groups.js";
 import { Approvals } from "./approvals.js";
 import { Commands, ACTIONS } from "./commands.js";
-import { ChatBridge } from "./chat.js";
-import { Debugger } from "./input.js";
+import { Debugger, cdpInput } from "./input.js";
+import { pageInput } from "./pageinput.js";
 import { indicator } from "./indicator.js";
+import { api, action, capabilities } from "./platform.js";
 import { serverURL, checkKey, checkName, isWebPage } from "./policy.js";
 
-const api = chrome;
 const version = api.runtime.getManifest().version;
+const caps = capabilities(api);
 
 function storeOf(area, key) {
   return {
@@ -27,20 +29,26 @@ let settings = { address: "", key: "", name: "", id: "", enabled: false };
 let grant = crypto.randomUUID();
 
 const groups = new Groups(api, storeOf("session", "groups"));
+// The sites allowed always outlive the browser; what one chat was allowed
+// ends with it.
 const approvals = new Approvals({
   store: storeOf("local", "grants"),
+  sessionStore: storeOf("session", "chatGrants"),
   onChange: () => void approvalsChanged(),
 });
-const dbg = new Debugger(api);
 const commands = new Commands({
   api,
   groups,
   approvals,
-  dbg,
   settings: () => settings,
   grant: () => grant,
   publish: () => publish(),
 });
+// Input through the debugger where the browser has it, through the page
+// where it has not (Firefox).
+commands.input = caps.debugger
+  ? cdpInput(new Debugger(api))
+  : pageInput(api, (tabId, action, params) => commands.script(tabId, action, params));
 
 const connection = new Connection({
   WebSocket,
@@ -52,23 +60,38 @@ const connection = new Connection({
     peer.onRequest("browser/command", (cmd, { signal }) => commands.handle(cmd, signal));
     peer.onNotification("$/cancelRequest", ({ id }) => peer.cancel(id));
     peer.onNotification("browser/turnEnded", ({ sessionId }) => turnEnded(sessionId));
-    chat.setup(peer);
   },
   onReady: () => publish(),
   onStatus: () => void badge(),
 });
-const chat = new ChatBridge({ connection, groups, publish: () => publish() });
+// Side panels that are open: a website question shows in them instead of a
+// window of its own.
+const panels = new Set();
+
+// ready settles once the stored state is loaded. Every listener waits for it:
+// an event that woke the worker must not act on the empty defaults - a Stop
+// would write them over the stored approvals. It starts before any listener
+// is registered, so none can reach it before it exists.
+const ready = initialize();
+ready.catch((e) => connection.setStatus(String(e?.message || e)));
+
+function whenReady(fn) {
+  return ready.catch(() => {}).then(fn);
+}
 
 let publishing = Promise.resolve();
 // publish announces every tab Coddy may reach, in order, so an announcement
-// never overtakes a newer one.
+// never overtakes a newer one. A Stop while the tabs are read makes the list
+// stale, and the Stop publishes the new one itself.
 function publish() {
   publishing = publishing
     .catch(() => {})
     .then(async () => {
       if (!connection.connected()) return;
+      const g = grant;
       const tabs = await groups.tabs();
-      connection.peer?.notify("browser/tabs", { tabs, grant });
+      if (g !== grant || !connection.connected()) return;
+      connection.peer?.notify("browser/tabs", { tabs, grant: g });
     });
   return publishing;
 }
@@ -91,8 +114,8 @@ async function turnEnded(sessionId) {
 async function badge() {
   const waiting = approvals.list().length;
   const text = waiting ? "!" : connection.connected() ? "" : settings.enabled ? "…" : "";
-  await api.action.setBadgeText({ text }).catch(() => {});
-  if (waiting) await api.action.setBadgeBackgroundColor({ color: "#d97706" }).catch(() => {});
+  await action.setBadgeText({ text }).catch(() => {});
+  if (waiting) await action.setBadgeBackgroundColor({ color: "#d97706" }).catch(() => {});
 }
 
 let approvalWindow = null;
@@ -100,7 +123,7 @@ async function approvalsChanged() {
   await badge();
   const pending = approvals.list();
   // An open side panel shows the question itself.
-  if (!pending.length || chat.open()) return;
+  if (!pending.length || panels.size) return;
   // The question needs a person: a small window of the extension's own, the
   // way a site permission prompt of the browser comes up.
   if (approvalWindow !== null) {
@@ -119,8 +142,11 @@ async function approvalsChanged() {
     .create(`coddy-approval-${first.id}`, {
       type: "basic",
       iconUrl: "icons/icon-128.png",
-      title: "Coddy asks to use a website",
-      message: `${first.origin}\nfor ${first.session.title || "a chat"}`,
+      title: first.kind === "chat" ? "A chat of another Coddy asks to use this browser" : "Coddy asks to use a website",
+      message:
+        first.kind === "chat"
+          ? `${first.session.title || "A chat"}\non ${first.session.node}`
+          : `${first.origin}\nfor ${first.session.title || "a chat"}`,
     })
     .catch(() => {});
 }
@@ -128,8 +154,9 @@ async function approvalsChanged() {
 async function stop() {
   grant = crypto.randomUUID();
   approvals.cancelAll();
+  await approvals.forgetRemote();
   await groups.stopAll();
-  await dbg.detachAll();
+  await commands.input.detachAll();
   for (const tab of await api.tabs.query({}))
     await api.scripting.executeScript({ target: { tabId: tab.id }, func: indicator, args: [false, ""] }).catch(() => {});
   if (connection.connected()) {
@@ -211,6 +238,21 @@ const handlers = {
     await publish();
   },
   stop,
+  // panelOpen answers the side panel opening: the web UI of the server the
+  // extension is connected to, and a one-time ticket that signs it in.
+  async panelOpen() {
+    if (!connection.connected()) throw new Error("Not connected to Coddy");
+    const opened = await connection.peer.request("panel/open", {});
+    return { webUI: settings.address, ticket: opened.ticket, browserId: settings.id };
+  },
+  // adopt gives the tab the person writes from to the chat a turn of the
+  // panel's web UI is for, before the turn starts.
+  async adopt({ tabId, sessionId, title }) {
+    if (!connection.connected()) throw new Error("Not connected to Coddy");
+    const tab = await groups.adopt(tabId, { id: sessionId, title: title || "" });
+    await publish();
+    return { browser_id: settings.id, tab_id: tab.id, url: tab.url, title: tab.title || "" };
+  },
   async decide({ id, choice }) {
     await approvals.decide(id, choice);
   },
@@ -225,8 +267,8 @@ api.runtime.onConnect.addListener((port) => {
     port.disconnect();
     return;
   }
-  chat.attach(port);
-  void badge();
+  panels.add(port);
+  port.onDisconnect.addListener(() => panels.delete(port));
 });
 
 api.runtime.onMessage.addListener((msg, sender, respond) => {
@@ -235,42 +277,80 @@ api.runtime.onMessage.addListener((msg, sender, respond) => {
   // which runs in the extension's isolated world of that page.
   const fromIndicator = sender.id === api.runtime.id && sender.tab && msg?.type === "stop" && msg.from === "indicator";
   if (!own && !fromIndicator) return false;
-  const handler = handlers[msg?.type];
+  const handler = Object.hasOwn(handlers, msg?.type) ? handlers[msg.type] : null;
   if (!handler) return false;
-  Promise.resolve(handler(msg)).then(
+  // A message that woke the worker waits for the state it changes.
+  whenReady(() => handler(msg)).then(
     (value) => respond({ value: value ?? null }),
     (e) => respond({ error: String(e?.message || e) }),
   );
   return true;
 });
 
-api.tabs.onUpdated.addListener((id, info, tab) => {
-  if (info.url || info.title || "groupId" in info || info.status === "complete")
-    if (groups.ownerOf(tab) !== null || "groupId" in info) publishSoon();
-});
-api.tabs.onRemoved.addListener(() => publishSoon());
-api.tabs.onAttached?.addListener(() => publishSoon());
-api.tabGroups.onRemoved.addListener(async (group) => {
-  await groups.groupRemoved(group.id);
-  publishSoon();
-});
+api.tabs.onUpdated.addListener((id, info, tab) =>
+  whenReady(() => {
+    if (info.url || info.title || "groupId" in info || info.status === "complete")
+      if (groups.ownerOf(tab) !== null || "groupId" in info) publishSoon();
+  }),
+);
+api.tabs.onRemoved.addListener(() => whenReady(publishSoon));
+api.tabs.onAttached?.addListener(() => whenReady(publishSoon));
+api.tabGroups.onRemoved.addListener((group) =>
+  whenReady(async () => {
+    await groups.groupRemoved(group.id);
+    publishSoon();
+  }),
+);
 api.windows.onRemoved.addListener((id) => {
   if (id === approvalWindow) approvalWindow = null;
+  if (id === panelWindow) panelWindow = null;
 });
-api.notifications.onClicked.addListener(() => void approvalsChanged());
+api.notifications.onClicked.addListener(() => whenReady(approvalsChanged));
 api.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") void api.runtime.openOptionsPage();
 });
-api.alarms.onAlarm.addListener(() => {
-  // A service worker woken by the alarm after Chrome tore it down finds no
-  // socket and dials again.
-  if (settings.enabled && !connection.socket) connection.connect();
-});
+api.alarms.onAlarm.addListener(() =>
+  whenReady(() => {
+    // A worker woken by the alarm after the browser tore it down finds no
+    // socket and dials again; a refused key or a scheduled retry waits.
+    if (settings.enabled && connection.idle()) connection.connect();
+  }),
+);
+
+// The toolbar button opens the web UI beside the page: the side panel in
+// Chrome, the sidebar in Firefox, a window of its own beside the browser's
+// where neither exists (Yandex Browser).
+let panelWindow = null;
+if (!caps.sidePanel) {
+  action.onClicked.addListener((tab) => {
+    // Firefox opens a sidebar only in the call that answers the click.
+    if (caps.sidebar) {
+      void api.sidebarAction.toggle();
+      return;
+    }
+    void openPanelWindow(tab?.windowId);
+  });
+}
+
+async function openPanelWindow(windowId) {
+  if (panelWindow !== null && (await api.windows.get(panelWindow).catch(() => null))) {
+    await api.windows.update(panelWindow, { focused: true }).catch(() => {});
+    return;
+  }
+  const beside = windowId ? await api.windows.get(windowId).catch(() => null) : null;
+  const width = 440;
+  const place = beside
+    ? { left: Math.max(0, beside.left + beside.width - width), top: beside.top, height: beside.height }
+    : { height: 800 };
+  const url = api.runtime.getURL(`panel.html${beside ? `?window=${beside.id}` : ""}`);
+  const w = await api.windows.create({ url, type: "popup", width, focused: true, ...place }).catch(() => null);
+  panelWindow = w?.id ?? null;
+}
 
 async function initialize() {
   await api.storage.local.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" });
-  // The toolbar button opens the chat beside the page, as a side panel.
-  await api.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  // The toolbar button opens the web UI beside the page, as a side panel.
+  if (caps.sidePanel) await api.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   await api.alarms.create("coddy-keepalive", { periodInMinutes: 0.5 });
   const stored = (await api.storage.local.get("settings")).settings || {};
   settings = { ...settings, ...stored };
@@ -283,4 +363,4 @@ async function initialize() {
   connection.connect();
 }
 
-void initialize().catch((e) => connection.setStatus(String(e?.message || e)));
+

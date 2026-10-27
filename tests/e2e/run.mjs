@@ -1,22 +1,26 @@
-// The built extension in a real Chromium against a mock of Coddy's listener:
-// connect, open a tab with the site approval, read and act on the page,
-// files both ways, another chat refused, turnEnded, the side panel's chat,
-// Stop.
+// The built extension in a real Chromium against a mock of Coddy's HTTP
+// server: connect, open a tab with the site approval, read and act on the
+// page, files both ways, another chat refused, turnEnded, the side panel's
+// web UI signed in by its ticket and a turn sent from it with the person's
+// tab, a chat of another Coddy asking first, Stop.
 //
 //   npm run build
 //   npm i --no-save playwright   # once; or NODE_PATH pointing at one
 //   npm run e2e
 //
-// CODDY_BROWSER_PATH points at a Chromium to use instead of Playwright's own;
-// CODDY_SCREENSHOT_DIR, when set, receives screenshots of the extension's pages.
+// CODDY_BROWSER_PATH points at a Chromium-family browser to use instead of
+// Playwright's own Chromium - Google Chrome, Yandex Browser - which gets the
+// extension through the DevTools protocol (launch.mjs). CODDY_SCREENSHOT_DIR,
+// when set, receives screenshots of the extension's pages. Firefox has a run
+// of its own, firefox.mjs.
 
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { startMockCoddy } from "./mock-coddy.mjs";
+import { launchChromium } from "./launch.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
@@ -36,15 +40,7 @@ const waitFor = async (what, ok, timeout = 15000) => {
 };
 
 const coddy = await startMockCoddy({ key });
-const profile = await fs.mkdtemp(path.join(os.tmpdir(), "coddy-for-browser-"));
-const context = await chromium.launchPersistentContext(profile, {
-  headless: true,
-  locale: "en-US",
-  // Chromium on Linux takes the language of its own controls from LANG.
-  env: { ...process.env, LANG: "en_US.UTF-8", LANGUAGE: "en" },
-  ...(process.env.CODDY_BROWSER_PATH ? { executablePath: process.env.CODDY_BROWSER_PATH } : { channel: "chromium" }),
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--lang=en-US"],
-});
+const { context, close } = await launchChromium(chromium, extension);
 const errors = [];
 const capture = async (page, name, widths = [1280], { fit = true } = {}) => {
   if (!shots) return;
@@ -130,7 +126,9 @@ try {
   const picture = await coddy.command("screenshot", tab);
   assert.match(picture.dataUrl, /^data:image\/png;base64,/);
   const png = Buffer.from(picture.dataUrl.split(",")[1], "base64");
-  const viewport = await page.evaluate(() => [innerWidth, innerHeight]);
+  // The visible part of the page: a browser that draws its scrollbar
+  // (Yandex Browser) leaves it out.
+  const viewport = await page.evaluate(() => [document.documentElement.clientWidth, document.documentElement.clientHeight]);
   assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], viewport, "one image pixel per CSS pixel");
 
   const up = coddy.stage(Buffer.from("upload fixture"), true);
@@ -154,8 +152,9 @@ try {
   coddy.notify("browser/turnEnded", { sessionId: "sess_e2e" });
   await waitFor("the indicator to go", async () => (await page.locator("#coddy-for-browser-indicator").count()) === 0);
 
-  // The side panel: the person writes from a page of their own, the tab goes
-  // into the chat's group, Coddy asks for a permission there and answers.
+  // The side panel: the web UI of the server in a frame, signed in by a
+  // one-time ticket, its strip in the web UI's theme. A turn sent from it
+  // takes the tab the person looks at into the turn's chat first.
   const mine = await context.newPage();
   await mine.goto(coddy.base + "/fixture?mine");
   await mine.bringToFront();
@@ -163,51 +162,47 @@ try {
   panel.on("pageerror", (e) => errors.push(e.message));
   await panel.setViewportSize({ width: 420, height: 720 });
   await panel.goto(origin + "/panel.html");
-  await panel.getByText("What should Coddy do in this tab?").waitFor();
-  await panel.locator("#tabbar").getByText("Coddy takes this tab when you send").waitFor();
-  await capture(panel, "panel-empty", [420], { fit: false });
-  // The approval mode is picked before the chat exists and goes with chat/new.
-  await panel.getByRole("button", { name: /Ask/ }).click();
-  await panel.getByRole("menuitemradio", { name: /Approve edits/ }).waitFor();
-  await capture(panel, "panel-modes", [420], { fit: false });
-  await panel.getByRole("menuitemradio", { name: /Approve edits/ }).click();
-  await panel.locator("#mode-label").getByText("Edits").waitFor();
-  await panel.locator("#prompt").fill("Read this page");
-  await panel.locator("#prompt").press("Enter");
-  await panel.getByRole("button", { name: "Allow", exact: true }).waitFor();
-  const mineTab = coddy.state.sent.tab.id;
-  assert.equal(coddy.state.sent.text, "Read this page");
-  assert.equal(coddy.state.sent.tab.url, coddy.base + "/fixture?mine");
-  await waitFor("the person's tab in the chat's group", () =>
-    coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === coddy.state.sent.sessionId),
+  const webUI = panel.frameLocator("#webui");
+  await webUI.getByText("Signed in").waitFor();
+  assert.equal(coddy.state.signins, 1);
+  await waitFor("the strip in the web UI's theme", async () =>
+    (await panel.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()])).join() ===
+    "dark,rgb(15, 15, 16)",
   );
-  await capture(panel, "panel-permission", [420], { fit: false });
-  await panel.getByRole("button", { name: "Allow", exact: true }).click();
-  await panel.locator(".message.assistant").getByText("Coddy fixture").waitFor();
-  assert.equal(coddy.state.permission, "allow");
-  assert.equal(await panel.locator(".tool[data-status=done]").count(), 1);
-  await panel.locator("#tabbar").getByText("in this chat").waitFor();
-  await capture(panel, "panel-answer", [420], { fit: false });
-  assert.equal(coddy.state.chats[0].permissionMode, "accept_edits");
-  // Skip all approvals asks first, then changes the chat on Coddy.
-  panel.once("dialog", (d) => d.accept());
-  await panel.getByRole("button", { name: /Edits/ }).click();
-  await panel.getByRole("menuitemradio", { name: /Skip all approvals/ }).click();
-  await panel.locator("#mode-label").getByText("Skip").waitFor();
-  assert.equal(coddy.state.chats[0].permissionMode, "bypass");
+  await panel.locator("#tabbar").getByText("taken when you send").waitFor();
+  await capture(panel, "panel-webui", [420], { fit: false });
+  await webUI.locator("#composer").fill("Read this page");
+  await webUI.getByRole("button", { name: "Send" }).click();
+  await webUI.getByText("The page is Coddy fixture.").waitFor();
+  assert.equal(coddy.state.turn.tab.url, coddy.base + "/fixture?mine");
+  assert.equal(coddy.state.turn.tab.browser_id, coddy.state.hello.browser.id);
+  const mineTab = coddy.state.turn.tab.tab_id;
+  await waitFor("the person's tab in the chat's group", () =>
+    coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "sess_panel_1"),
+  );
+  await panel.locator("#tabbar").getByText('in "Read this page"').waitFor();
   // Take back ungroups the tab; Share puts it in the shared group.
   await panel.locator("#tabbar").getByRole("button", { name: "Take back" }).click();
   await waitFor("the tab out of every group", () => !coddy.state.tabs.find((t) => t.id === mineTab));
   await panel.locator("#tabbar").getByRole("button", { name: "Share" }).click();
   await waitFor("the tab in the shared group", () => coddy.state.tabs.find((t) => t.id === mineTab && !t.sessionId));
-  await panel.locator("#tabbar").getByText("shared with Coddy").waitFor();
-  // The chat is listed, and opens again with its messages.
-  await panel.getByRole("button", { name: "New chat" }).click();
-  await panel.getByText("What should Coddy do in this tab?").waitFor();
-  await panel.getByRole("button", { name: "Chats" }).click();
-  await panel.getByRole("button", { name: "Read the page" }).click();
-  await panel.locator(".message.user").getByText("Read this page").waitFor();
-  await panel.locator(".message.assistant strong").getByText("Coddy fixture").waitFor();
+  await panel.locator("#tabbar").getByText("shared").waitFor();
+
+  // A chat of another Coddy asks first, in the panel, and the site it
+  // reaches asks again for it: "always" covers only the server's own chats.
+  const laptop = { id: "laptop/sess_trip", title: "Trip", node: "laptop" };
+  const remote = coddy.command("snapshot", { tabId: mineTab, session: laptop });
+  await panel.getByText("A chat of another Coddy asks to use this browser").waitFor();
+  await panel.getByText('The chat "Trip" runs on laptop').waitFor();
+  await capture(panel, "panel-remote-chat", [420], { fit: false });
+  await panel.getByRole("button", { name: "Allow for this chat" }).click();
+  await panel.getByText("Coddy asks to use a website").waitFor();
+  assert.equal(await panel.getByRole("button", { name: "Always allow" }).count(), 0);
+  await panel.getByRole("button", { name: "Allow for this chat" }).click();
+  assert.equal((await remote).title, "Coddy fixture");
+  await waitFor("the tab in the remote chat's group", () =>
+    coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "laptop/sess_trip"),
+  );
 
   // release hands the tab back to the shared group; Stop withdraws everything.
   assert.deepEqual(await coddy.command("release", {}), { released: 1 });
@@ -218,9 +213,16 @@ try {
   await assert.rejects(coddy.command("snapshot", tab), (e) => ["stopped", "not_shared"].includes(e.data?.reason));
 
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel chat with a permission, release, Stop");
+  // Stop took back what the chat of another Coddy was allowed.
+  const again = coddy.command("open_tab", { params: { url: coddy.base + "/fixture?again" }, session: laptop });
+  again.catch(() => {}); // refused before the assertion below takes it
+  await panel.getByText("A chat of another Coddy asks to use this browser").waitFor();
+  await panel.getByRole("button", { name: "Decline" }).click();
+  await assert.rejects(again, (e) => e.data?.reason === "chat_declined");
+
+  assert.deepEqual(errors, []);
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Stop");
 } finally {
-  await context.close();
+  await close();
   await coddy.close();
-  await fs.rm(profile, { recursive: true, force: true });
 }

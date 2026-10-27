@@ -1,14 +1,15 @@
-// Connects the built extension in a real Chromium to a real Coddy listener
-// and keeps it there until stdin closes, answering every website question
-// with "Always allow". coddy-agent's live test runs it to check both sides of
-// the protocol against each other:
+// Connects the built extension in a real Chromium to a real Coddy and keeps
+// it there until stdin closes, answering every website question with "Always
+// allow". coddy-agent's live test runs it to check both sides of the protocol
+// against each other:
 //
-//   CODDY_URL=http://127.0.0.1:12348 CODDY_KEY=... node tests/e2e/drive.mjs
+//   CODDY_URL=http://127.0.0.1:12345 CODDY_KEY=... node tests/e2e/drive.mjs
 //
 // It prints "CONNECTED" once the extension reports Connected. With
-// CODDY_PANEL_PAGE and CODDY_PANEL_PROMPT it then opens that page, writes the
-// prompt in the side panel from it, allows every tool the panel is asked
-// about and prints "ANSWER: <text>" once the answer is in.
+// CODDY_PANEL_PAGE, CODDY_PANEL_PROMPT and CODDY_PANEL_EXPECT it then opens
+// that page, sends the prompt from the composer of the web UI in the side
+// panel, allows every website the panel is asked about and prints
+// "ANSWER: <text>" once the expected text shows in the web UI.
 
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -60,18 +61,20 @@ try {
     await page.goto(process.env.CODDY_PANEL_PAGE);
     await page.bringToFront();
     const panel = await context.newPage();
+    await panel.setViewportSize({ width: 440, height: 860 });
     await panel.goto(origin + "/panel.html");
-    await panel.getByText("What should Coddy do in this tab?").waitFor();
-    await panel.locator("#prompt").fill(process.env.CODDY_PANEL_PROMPT);
-    await panel.locator("#prompt").press("Enter");
-    const allow = panel.locator(".card.ask button.primary, .card.approval button.primary");
-    const answer = panel.locator(".message.assistant");
-    for (let i = 0; i < 600 && !(await answer.count()); i++) {
+    const webUI = panel.frameLocator("#webui");
+    const composer = webUI.locator("textarea#composer");
+    await composer.waitFor({ timeout: 30000 });
+    await composer.fill(process.env.CODDY_PANEL_PROMPT);
+    await composer.press("Enter");
+    const allow = panel.locator(".card.approval button.primary");
+    const expected = webUI.getByText(process.env.CODDY_PANEL_EXPECT || "", { exact: false });
+    for (let i = 0; i < 600 && !(await expected.count()); i++) {
       if (await allow.count()) await allow.first().click().catch(() => {});
       await new Promise((r) => setTimeout(r, 100));
     }
-    await panel.locator("#send[title=Send]").waitFor({ timeout: 30000 });
-    console.log("ANSWER: " + (await answer.last().innerText()).replace(/\s+/g, " "));
+    console.log("ANSWER: " + (await expected.first().innerText({ timeout: 1000 })).replace(/\s+/g, " "));
   }
 } catch (e) {
   console.error(e);

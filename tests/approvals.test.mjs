@@ -62,3 +62,22 @@ test("an always grant is kept and a revoke asks again", async () => {
   await a.revoke("https://example.com");
   await assert.rejects(a.ensure("https://example.com", { id: "s9" }, "click"), (e) => e.reason === "site_prompt_timeout");
 });
+
+test("a command cancelled before its question asks nothing", async () => {
+  const { a } = await setup();
+  const abort = new AbortController();
+  abort.abort();
+  await assert.rejects(a.ensure("https://example.com", { id: "s1" }, "click", abort.signal), (e) => e.reason === "cancelled");
+  assert.equal(a.list().length, 0);
+});
+
+test("a site allowed always outlives the browser, a chat's answer does not", async () => {
+  const store = memoryStore();
+  const session = memoryStore();
+  const a = new Approvals({ store, sessionStore: session });
+  await a.load();
+  await a.allow("https://always.example", "s1", "always");
+  await a.allow("https://chat.example", "s1", "chat");
+  assert.deepEqual(store.peek(), { always: ["https://always.example"] });
+  assert.deepEqual(session.peek().chats, { s1: ["https://chat.example"] });
+});

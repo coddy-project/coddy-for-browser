@@ -1,4 +1,4 @@
-// indicator is serialized by chrome.scripting.executeScript into a tab Coddy
+// indicator is serialized by scripting.executeScript into a tab Coddy
 // works in: a glow around the page and a Stop button at the bottom, so the
 // user sees which tab the agent drives and can stop it from the page itself.
 // It lives in a closed shadow root and passes every pointer event through but
@@ -41,7 +41,7 @@ export function indicator(show, label) {
   stop.textContent = "Stop";
   stop.addEventListener("click", (event) => {
     if (!event.isTrusted) return;
-    chrome.runtime.sendMessage({ type: "stop", from: "indicator" });
+    (globalThis.browser ?? globalThis.chrome).runtime.sendMessage({ type: "stop", from: "indicator" });
   });
   pill.append(text, stop);
   shadow.append(style, glow, pill);

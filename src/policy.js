@@ -21,8 +21,8 @@ export function isWebPage(address) {
 
 const loopback = ["localhost", "127.0.0.1", "[::1]"];
 
-// serverURL is the address of Coddy's browser listener as the user typed
-// it, checked: plain HTTP only on this machine, so the key and the pages never
+// serverURL is the address of the Coddy server as the user typed it,
+// checked: plain HTTP only on this machine, so the key and the pages never
 // cross a network in the clear.
 export function serverURL(address) {
   const url = new URL(String(address || "").trim());
@@ -30,7 +30,7 @@ export function serverURL(address) {
     throw new Error("Enter an HTTP(S) server address without credentials or query");
   if (url.protocol === "http:" && !loopback.includes(url.hostname))
     throw new Error("Use HTTPS for a Coddy server on another machine");
-  if (url.pathname !== "/") throw new Error("Enter the listener address without a path");
+  if (url.pathname !== "/") throw new Error("Enter the server address without a path");
   return url.origin;
 }
 
@@ -45,8 +45,10 @@ export function fileURL(server, ticket) {
 
 // Grants say which websites Coddy may act on without asking: always, or for
 // the rest of one chat (until the browser restarts).
-export function granted(origin, sessionId, grants) {
-  return grants.always.includes(origin) || (grants.chats[sessionId] || []).includes(origin);
+// granted reports whether origin may be acted on for the chat. An "always"
+// covers the chats of the connected server, never a remote one.
+export function granted(origin, sessionId, grants, { remote = false } = {}) {
+  return (!remote && grants.always.includes(origin)) || (grants.chats[sessionId] || []).includes(origin);
 }
 
 export function grant(grants, origin, sessionId, scope) {
@@ -61,7 +63,7 @@ export function grant(grants, origin, sessionId, scope) {
 export function revoke(grants, origin) {
   const chats = {};
   for (const [id, origins] of Object.entries(grants.chats)) chats[id] = origins.filter((o) => o !== origin);
-  return { always: grants.always.filter((o) => o !== origin), chats };
+  return { ...grants, always: grants.always.filter((o) => o !== origin), chats };
 }
 
 // Keys of the extension key and browser name the user types.

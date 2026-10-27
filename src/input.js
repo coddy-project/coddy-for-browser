@@ -1,7 +1,8 @@
-// Trusted input and screenshots through the Chrome DevTools Protocol. The
-// debugger stays attached to a tab while Coddy works there and detaches after
-// a short idle, so Chrome's "started debugging this browser" bar does not
-// flicker on every click.
+// Trusted input and screenshots through the Chrome DevTools Protocol, where
+// the browser has the debugger API (Chrome, Yandex Browser). The debugger
+// stays attached to a tab while Coddy works there and detaches after a short
+// idle, so the "started debugging this browser" bar does not flicker on every
+// click.
 
 const IDLE_MS = 20000;
 const VERSION = "1.3";
@@ -22,18 +23,21 @@ export class Debugger {
   async attach(tabId) {
     let entry = this.attached.get(tabId);
     if (!entry) {
-      let own = true;
-      try {
-        await this.api.debugger.attach({ tabId }, VERSION);
-      } catch (e) {
+      // The attachment is recorded before it is awaited, so two first actions
+      // on a tab share one attachment and the extension detaches its own.
+      entry = { own: true, timer: null, ready: null };
+      entry.ready = this.api.debugger.attach({ tabId }, VERSION).catch((e) => {
         // DevTools open on the tab holds the attachment; use it and leave it
         // alone when done.
-        if (!/already attached/i.test(String(e?.message || e))) throw e;
-        own = false;
-      }
-      entry = { own, timer: null };
+        if (!/already attached/i.test(String(e?.message || e))) {
+          if (this.attached.get(tabId) === entry) this.attached.delete(tabId);
+          throw e;
+        }
+        entry.own = false;
+      });
       this.attached.set(tabId, entry);
     }
+    await entry.ready;
     clearTimeout(entry.timer);
     entry.timer = setTimeout(() => this.detach(tabId), IDLE_MS);
     return entry;
@@ -109,8 +113,14 @@ export function parseKey(spec) {
 
 const BUTTONS = ["left", "right", "middle"];
 
-export async function cdpAction(dbg, tabId, action, p, expected) {
-  const send = (method, params) => dbg.send(tabId, method, params, expected);
+// cdpAction runs one input action or a screenshot. guard() throws when the
+// command was cancelled or stopped meanwhile, and runs before every step of a
+// multi-step action.
+export async function cdpAction(dbg, tabId, action, p, expected, guard) {
+  const send = (method, params) => {
+    guard?.();
+    return dbg.send(tabId, method, params, expected);
+  };
   if (action === "screenshot") {
     // One image pixel per CSS pixel: the coordinates the model reads off the
     // picture are the ones click takes.
@@ -171,14 +181,37 @@ export async function cdpAction(dbg, tabId, action, p, expected) {
   if (action === "drag") {
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y });
     await send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount: 1 });
-    const steps = 8;
-    for (let i = 1; i <= steps; i++) {
-      const x = p.x + ((p.to_x - p.x) * i) / steps;
-      const y = p.y + ((p.to_y - p.y) * i) / steps;
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "left", buttons: 1 });
+    let at = { x: p.x, y: p.y };
+    try {
+      const steps = 8;
+      for (let i = 1; i <= steps; i++) {
+        at = { x: p.x + ((p.to_x - p.x) * i) / steps, y: p.y + ((p.to_y - p.y) * i) / steps };
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...at, button: "left", buttons: 1 });
+      }
+    } finally {
+      // A pressed button is always released, a stopped drag included.
+      await dbg
+        .send(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", ...at, button: "left", clickCount: 1 }, expected)
+        .catch(() => {});
     }
-    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.to_x, y: p.to_y, button: "left", clickCount: 1 });
     return { ok: true };
   }
   throw new Error("Unsupported input action");
+}
+
+// cdpInput is input through the debugger: trusted like a person's.
+export function cdpInput(dbg) {
+  return {
+    trusted: true,
+    act: (tabId, action, p, expected, guard) => cdpAction(dbg, tabId, action, p, expected, guard),
+    screenshot: (tabId, view, expected) => cdpAction(dbg, tabId, "screenshot", { scale: view?.scale }, expected),
+    // history is the tab's navigation list, for asking about the site back
+    // or forward leads to before going there.
+    async history(tabId, expected) {
+      const { currentIndex, entries } = await dbg.send(tabId, "Page.getNavigationHistory", {}, expected);
+      return { currentIndex, entries: entries.map((e) => ({ id: e.id, url: e.url })) };
+    },
+    go: (tabId, entryId, expected) => dbg.send(tabId, "Page.navigateToHistoryEntry", { entryId }, expected),
+    detachAll: () => dbg.detachAll(),
+  };
 }

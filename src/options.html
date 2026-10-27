@@ -17,13 +17,13 @@
       <section class="card">
         <h2>Connection</h2>
         <p class="muted">
-          The extension connects to the browser listener of your <code>coddy serve</code> and lets its chats
-          use the tabs you share. Turn the listener on with <code>browser.enable</code> in Coddy's configuration.
+          The extension connects to your <code>coddy serve</code>, shows its web UI in the side panel and lets its
+          chats use the tabs you share. Turn it on with <code>browser.enable</code> in Coddy's configuration.
         </p>
         <form id="connect">
           <label
             >Server address
-            <input id="address" type="url" placeholder="http://127.0.0.1:12348" required spellcheck="false" />
+            <input id="address" type="url" placeholder="http://127.0.0.1:12345" required spellcheck="false" />
           </label>
           <label
             >Extension key
@@ -43,17 +43,28 @@
       </section>
       <section class="card">
         <h2>Always allowed websites</h2>
-        <p class="muted">Coddy acts on these sites without asking. Every other site asks first.</p>
+        <p class="muted">
+          The chats of your server act on these sites without asking; every other site asks first. A chat from another
+          machine asks about every site.
+        </p>
         <ul id="allowed" class="list"></ul>
       </section>
       <section class="card">
         <h2>How sharing works</h2>
         <p>
-          Coddy reaches only the tabs in its tab groups. Share a tab from the toolbar button, or drag it into the
-          <strong>Coddy</strong> group. A chat that works in a shared tab moves it into a group of its own, named after
-          the chat; a tab Coddy opens starts there. Drag a tab out of a group to take it back.
+          Coddy reaches only the tabs in its tab groups. Share a tab with <strong>Share</strong> in the side panel, or
+          drag it into the <strong>Coddy</strong> group. A chat that works in a shared tab moves it into a group of its
+          own, named after the chat; a tab Coddy opens starts there. Drag a tab out of a group, or press
+          <strong>Take back</strong>, to take it back.
         </p>
-        <p><strong>Stop Coddy</strong> cancels every action and ungroups every tab; the tabs stay open.</p>
+        <p>
+          A chat of another Coddy, such as a console or a node of your swarm, asks you before its first action, and its
+          tab group names the machine it runs on.
+        </p>
+        <p>
+          <strong>Stop Coddy</strong> cancels every action, ungroups every tab and takes back what the chats from other
+          machines were allowed; the tabs stay open.
+        </p>
       </section>
       <p id="version" class="muted"></p>
     </main>

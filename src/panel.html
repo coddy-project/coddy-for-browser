@@ -9,15 +9,8 @@
   <body class="panel">
     <header class="bar panel-bar">
       <img src="icons/icon-32.png" alt="" width="18" height="18" />
-      <strong>Coddy</strong>
+      <span id="tabbar" class="tabbar" aria-live="polite"></span>
       <span id="status" class="status dot-only" role="status" title="Loading">Loading&hellip;</span>
-      <span class="spacer"></span>
-      <button id="history" class="icon" type="button" title="Chats" aria-label="Chats" aria-expanded="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v4h4" /></svg>
-      </button>
-      <button id="new" class="icon" type="button" title="New chat" aria-label="New chat">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
       <button id="settings" class="icon" type="button" title="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
@@ -30,37 +23,13 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
       </button>
     </header>
-    <nav id="chats" class="chats" hidden aria-label="Chats"></nav>
-    <div id="tabbar" class="tabbar" aria-live="polite"></div>
     <p id="error" class="error" role="alert" hidden></p>
+    <section id="approvals" aria-live="assertive"></section>
     <section id="offline" class="card offline" hidden>
       <p id="offline-text">Not connected to Coddy.</p>
       <button id="open-settings" class="primary" type="button">Settings</button>
     </section>
-    <section id="approvals" aria-live="assertive"></section>
-    <main id="messages" class="messages" aria-live="polite">
-      <div id="empty" class="empty">
-        <img src="icons/icon-48.png" alt="" width="40" height="40" />
-        <p>What should Coddy do in this tab?</p>
-      </div>
-    </main>
-    <form id="composer" class="composer">
-      <textarea id="prompt" rows="2" placeholder="Ask Coddy to work with this page" aria-label="Message"></textarea>
-      <div class="composer-row">
-        <div class="mode-picker">
-          <button id="mode" class="mode" type="button" aria-haspopup="menu" aria-expanded="false" title="When Coddy asks before it acts">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="mode-icon" d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.4 14a1.5 1.5 0 0 1 2.4-1.8L8 15" /></svg>
-            <span id="mode-label">Ask</span>
-            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-          </button>
-          <div id="mode-menu" class="menu" role="menu" hidden></div>
-        </div>
-        <small id="chat-title" class="muted"></small>
-        <button id="send" class="send" type="submit" title="Send" aria-label="Send">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-        </button>
-      </div>
-    </form>
+    <iframe id="webui" title="Coddy" hidden></iframe>
     <script type="module" src="panel.js"></script>
   </body>
 </html>

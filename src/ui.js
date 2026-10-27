@@ -1,7 +1,8 @@
 // Helpers the extension's pages share.
+import { api } from "./platform.js";
 
 export async function request(msg) {
-  const r = await chrome.runtime.sendMessage(msg);
+  const r = await api.runtime.sendMessage(msg);
   if (!r) throw new Error("The extension did not answer; reload it");
   if (r.error) throw new Error(r.error);
   return r.value;

@@ -1,5 +1,11 @@
 name: CI
 
+# Every push and pull request: the unit tests, the packages of both browser
+# families as downloadable artifacts, and the built extension in a real
+# Chromium and a real Firefox against a mock of Coddy. The jobs run side by
+# side; "CI passed" waits for all of them. A v* tag also publishes a release
+# with the packages attached.
+
 on:
   push:
     branches: [main]
@@ -10,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Unit tests and build
+  build:
+    name: Unit tests and packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,14 +26,25 @@ jobs:
           node-version: 24
       - run: npm test
       - run: npm run build
-      - name: The version of package.json is the version of the manifest
-        run: node -e "const p=require('./package.json'),m=require('./dist/chrome/manifest.json'); if(p.version!==m.version) process.exit(1)"
+      - name: The version of package.json is the version of both manifests
+        run: |
+          node -e "
+            const v = require('./package.json').version;
+            for (const b of ['chrome', 'firefox'])
+              if (require('./dist/' + b + '/manifest.json').version !== v) { console.error(b + ' manifest version'); process.exit(1); }
+          "
+      # One artifact per browser family, each holding its archive: download
+      # one from the run's summary and install it as the README says.
       - uses: actions/upload-artifact@v4
         with:
-          name: coddy-for-browser
-          path: dist/coddy-for-browser-*.zip
+          name: coddy-for-browser-chrome
+          path: dist/coddy-for-browser-chrome-*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coddy-for-browser-firefox
+          path: dist/coddy-for-browser-firefox-*.zip
 
-  e2e:
+  e2e-chromium:
     name: Real Chromium against a mock of Coddy
     runs-on: ubuntu-latest
     steps:
@@ -46,14 +63,50 @@ jobs:
         with:
           name: e2e-screenshots
           path: screenshots
+          if-no-files-found: ignore
+
+  e2e-firefox:
+    name: Real Firefox against a mock of Coddy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: browser-actions/setup-firefox@v1
+        id: firefox
+        with:
+          firefox-version: latest
+      - run: npm run build
+      - run: npm i --no-save puppeteer-core
+      - run: npm run e2e:firefox
+        env:
+          CODDY_FIREFOX_PATH: ${{ steps.firefox.outputs.firefox-path }}
+
+  passed:
+    name: CI passed
+    if: always()
+    needs: [build, e2e-chromium, e2e-firefox]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, e2e]
+    needs: [passed]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # Secrets cannot be tested in a step's condition; their presence can.
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,7 +115,20 @@ jobs:
       - name: The tag is the version of package.json
         run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
       - run: npm run build
-      - name: Publish the archive
+      # Release Firefox installs only an add-on Mozilla signed. With the
+      # AMO_JWT_ISSUER and AMO_JWT_SECRET secrets set (an API key of
+      # addons.mozilla.org), the Firefox build is signed as an unlisted
+      # add-on and the release carries the .xpi; without them it carries the
+      # unsigned archive alone.
+      - name: Sign the Firefox build
+        if: env.AMO_JWT_ISSUER != ''
+        run: node scripts/sign.mjs
+      - name: Publish the packages
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/coddy-for-browser-*.zip --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node scripts/release-notes.mjs "$version" > notes.md
+          shopt -s nullglob
+          gh release create "$GITHUB_REF_NAME" dist/coddy-for-browser-*.zip dist/coddy-for-browser-*.xpi \
+            --title "Coddy for Browser $version" --notes-file notes.md
