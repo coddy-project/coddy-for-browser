@@ -284,6 +284,9 @@ npm i --no-save puppeteer-core
 npm run e2e:firefox           # сборка для Firefox в настоящем Firefox против той же имитации
 ```
 
+Иконки рисует `npm run icons` (нужен Playwright) из `src/icons/icon-small.svg` (16 и 32 px, плитка на всю иконку) и
+`src/icons/icon.svg` (48 и 128 px, с полями, которых просят магазины).
+
 `CODDY_BROWSER_PATH` указывает прогону в Chromium на установленный браузер вместо Chromium из Playwright, например
 Google Chrome или Яндекс Браузер. Такой браузер получает расширение через протокол DevTools, потому что брендовые
 браузеры игнорируют `--load-extension`. `CODDY_FIREFOX_PATH` задаёт Firefox для прогона в Firefox,

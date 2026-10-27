@@ -276,6 +276,9 @@ npm i --no-save puppeteer-core
 npm run e2e:firefox           # the Firefox build in a real Firefox against the same mock
 ```
 
+The icons are rendered from `src/icons/icon-small.svg` (16 and 32 px, the tile fills the icon) and
+`src/icons/icon.svg` (48 and 128 px, with the margin the stores ask for) by `npm run icons`, which needs Playwright.
+
 `CODDY_BROWSER_PATH` points the Chromium run at an installed browser instead of Playwright's Chromium - Google Chrome,
 Yandex Browser - which gets the extension through the DevTools protocol, since branded browsers ignore
 `--load-extension`. `CODDY_FIREFOX_PATH` names the Firefox of the Firefox run. `CODDY_SCREENSHOT_DIR` collects

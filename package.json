@@ -12,6 +12,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test --test-timeout=30000 tests/*.test.mjs",
     "e2e": "node tests/e2e/run.mjs",
-    "e2e:firefox": "node tests/e2e/firefox.mjs"
+    "e2e:firefox": "node tests/e2e/firefox.mjs",
+    "icons": "node scripts/render-icons.mjs"
   }
 }
