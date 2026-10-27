@@ -232,6 +232,77 @@ The settings page shows the connection in its corner: green while connected, amb
 grey while disconnected, red when the server refused the key or speaks another protocol version. **Disconnect** stops Coddy and closes the
 connection.
 
+### A phone with Firefox for Android
+
+The extension on a phone connects to a Coddy server the same way, in one of three setups. In each, the settings page
+opens from **Extensions** in the browser's menu (**Coddy for Browser**, then the settings button of the panel), and
+the web UI opens in a tab of its own from the same entry. Coddy keeps working with Firefox in the background, behind
+Termux or another app; a question about a website or a chat then waits in Firefox, so let Firefox show notifications
+when Android asks, and the notification tells you.
+
+**Coddy on the phone itself.** `coddy serve` runs in [Termux](https://termux.dev), and the extension connects to it
+over the phone's loopback, so nothing leaves the phone but the model calls. Install Termux (F-Droid, its GitHub
+releases or Google Play), then in Termux:
+
+```bash
+pkg install curl tmux
+curl -fsSL https://coddy.dev/install.sh | bash
+source ~/.bashrc
+```
+
+Turn the browser on in `~/.coddy/config.yaml`, next to the provider and model of
+[Configuration](https://coddy.dev/docs/getting-started/configuration):
+
+```yaml
+browser:
+  enable: true
+  token: ${CODDY_BROWSER_KEY}
+```
+
+Put `CODDY_BROWSER_KEY=<openssl rand -hex 32>` into `~/.coddy/.env`, start the server with `termux-wake-lock` and
+`tmux new -s coddy 'coddy serve'`, and enter `http://127.0.0.1:12345` and the key on the extension's settings page.
+Let Termux run unrestricted in Android's battery settings, or Android stops the server when the screen goes off
+([Android (Termux)](https://coddy.dev/docs/getting-started/android)).
+
+**Coddy on another machine.** A `coddy serve` on a laptop or a server drives the phone's browser over the network.
+The extension takes plain HTTP only for the phone's own loopback, so the server needs HTTPS: `coddy serve` has no TLS
+of its own, and a TLS-terminating proxy (Caddy, nginx) in front of its HTTP server gives it one. Enter the proxy's
+address, such as `https://coddy.example.com`, and the server's `browser.token` on the settings page. A certificate of
+a public authority works as it is. One of your own certificate authority needs two steps on the phone: install the
+authority's certificate in Android as a CA certificate (under **Encryption and credentials** in the security
+settings, named a little differently between Android versions), then turn on **Use third party CA certificates** in
+Firefox's **Secret Settings**, which appear after five taps on the Firefox logo under **Settings**, **About
+Firefox**. With
+`browser.serve_remote: true` the chats of the server's console, editors and swarm nodes reach the phone's browser
+too, and each asks on the phone first.
+
+**The phone as a node of a swarm.** Coddy in Termux joins a relay on a laptop or a server with `swarm.join`, as in
+[Android phones as swarm nodes](https://coddy.dev/docs/tutorials/swarm-android-nodes), and the extension connects to
+the phone's own `coddy serve` over loopback, as in the first setup. The phone dials the relay, so it needs no public
+address and no open port, and the relay's web UI and console drive it through that connection: a turn started there
+on the phone runs on the phone and uses its browser like any chat of the phone's server. Other machines of the swarm
+reach the phone's browser through the relay at `<relay>/swarm/nodes/<phone>/coddy/browser/v1/...` once the phone has
+`browser.serve_remote: true`, and each of their chats asks on the phone first. The phone's `~/.coddy/config.yaml`:
+
+```yaml
+httpserver:
+  enable: true
+  auth_token: ${NODE_TOKEN}
+browser:
+  enable: true
+  token: ${CODDY_BROWSER_KEY}
+  serve_remote: true
+swarm:
+  join:
+    - url: https://relay.example.com:12346
+      name: pixel
+      pairing_token: ${SWARM_PAIRING_TOKEN}
+      token: ${NODE_TOKEN}
+```
+
+On a phone a page Coddy points into or takes a picture of comes to the front first: Firefox for Android lays out and
+captures only the tab in front.
+
 ## Use it
 
 Press the toolbar button and write in the side panel, on the page you want Coddy to work with:
