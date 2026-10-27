@@ -8,39 +8,114 @@ takes screenshots and moves files, and the extension does it in the tabs you sha
 
 [Русская версия](README.ru.md)
 
+<p align="center">
+  <img src="docs/screenshots/side-panel-dark-420.png" width="360" alt="The web UI of Coddy in the side panel, next to the page it works on">
+</p>
+
 The extension talks only to the Coddy server you point it at. The model runs on that server; the extension
 executes the actions and asks you before Coddy touches a new website.
 
 ## How it works
 
-```
- Coddy chat --> browser tool --> coddy serve   <==== WebSocket (JSON-RPC 2.0) ====  Coddy for Browser
-                                 HTTP server         opened by the extension          (this extension)
-                                 :12345, /browser/v1/connect                                 |
-        a console, an editor,          ^                                                    v
-        a node of the swarm  ---------/  /coddy/browser/v1          your tabs in the Coddy tab groups
+### The parts
+
+```mermaid
+flowchart TB
+  subgraph browser["Your browser"]
+    direction LR
+    panel["Side panel:<br/>the web UI in a frame"]
+    ext["Extension"]
+    tabs["Tabs in the<br/>Coddy tab groups"]
+    panel -. "postMessage" .-> ext
+    ext -- "reads, acts" --> tabs
+  end
+  subgraph home["coddy serve, next to the browser"]
+    direction LR
+    http["HTTP server"] --- agent["Chats and<br/>the browser tool"]
+  end
+  other["Another Coddy process:<br/>console, editor, swarm node"]
+  model["Model provider"]
+  ext == "WebSocket, JSON-RPC" ==> http
+  panel -- "web UI over HTTP" --> http
+  other -- "HTTPS /coddy/browser/v1" --> http
+  agent -- "conversation with page contents" --> model
 ```
 
 - **The extension dials out.** It opens one WebSocket to the HTTP server of `coddy serve`, its home server, and keeps
   it open. Coddy's actions travel down that socket as requests the extension answers, so Coddy reaches a browser it
   has no route to: a laptop behind NAT works the same as a browser on the server itself.
-- **The web UI beside the page.** The toolbar button opens the side panel: the web UI of the same server, signed in
+- **The side panel is the web UI.** The toolbar button opens the web UI of the same server beside the page, signed in
   by a one-time ticket the extension gets over its socket, with the whole composer - models, attachments, approval
   modes, history. The tab you write from goes into the chat's tab group before the message is sent, so "summarize
   this page" or "fill this form" works on the page in front of you.
 - **Any chat of your Coddy can use it.** A console or an editor on the same machine, and the other nodes of your
   swarm, reach the browser through the home server's HTTP API (`browser.serve_remote`). The first action of such a
   chat asks you in the extension, naming the machine it runs on.
-- **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its tab groups of the browser. You share a tab with
-  every chat by pressing **Share** in the side panel, or by dragging it into the **Coddy** group. A chat that works in
-  a shared tab moves it into a group of its own, titled after the chat, and no other chat may act there. A tab Coddy
-  opens starts in the chat's group. Drag a tab out of a group, or press **Take back**, to take it back.
+- **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its tab groups of the browser. You share a tab
+  with every chat by pressing **Share** in the side panel, or by dragging it into the **Coddy** group. A chat that
+  works in a shared tab moves it into a group of its own, titled after the chat, and no other chat may act there. A
+  tab Coddy opens starts in the chat's group. Drag a tab out of a group, or press **Take back**, to take it back.
 - **You approve websites.** Before the first action on a website, a small window of the extension asks: allow for
   this chat, always allow, or decline. "Always" covers the chats of the home server only: a chat from another
   machine asks for every new website. A page cannot answer these questions for you.
-- **You can stop it.** The stop button in the side panel's header, or the Stop button on the page Coddy works in,
-  cancels every action, ungroups every tab and takes back what the chats from other machines were allowed; the tabs
-  stay open.
+- **You can stop it.** The Stop button on the page Coddy works in cancels every action, ungroups every tab and takes
+  back what the chats from other machines were allowed; the tabs stay open. **Disconnect** on the settings page does
+  the same and closes the connection.
+
+### A turn from the side panel
+
+```mermaid
+sequenceDiagram
+  actor You
+  participant UI as Web UI in the panel
+  participant Ext as Extension
+  participant S as coddy serve
+  participant M as Model provider
+  You->>UI: Summarize this page
+  UI->>Ext: Which tab? (postMessage)
+  Ext->>Ext: Move the tab into the chat's group
+  Ext-->>UI: Tab id, address, title
+  UI->>S: POST /v1/responses with metadata.browser
+  S->>M: The conversation, the tab named in the turn context
+  M-->>S: Call the browser tool: snapshot
+  S->>Ext: browser/command over the WebSocket
+  Ext->>You: First action on this website: allow?
+  You-->>Ext: Allow for this chat
+  Ext->>Ext: Read the page
+  Ext-->>S: Text and elements of the page
+  S->>M: The tool result
+  M-->>S: The answer
+  S-->>UI: The answer streams
+```
+
+### A chat of another Coddy process
+
+```mermaid
+sequenceDiagram
+  participant C as Console, editor or swarm node
+  participant S as coddy serve, home of the browser
+  participant Ext as Extension
+  actor You
+  C->>S: POST /coddy/browser/v1/call with the API token, its machine and chat
+  S->>Ext: browser/command, session.node names the machine
+  Ext->>You: A chat of another Coddy asks to use this browser
+  You-->>Ext: Allow for this chat
+  Ext-->>S: The result
+  S-->>C: The result, files carried inside the call
+```
+
+### What goes where
+
+| What | From | To | How |
+| --- | --- | --- | --- |
+| Coddy's actions and their results | `coddy serve` | the extension and back | the WebSocket the extension opened, JSON-RPC 2.0 |
+| The extension key | the extension | its home server | in `initialize`, once per connection; kept in the extension's storage |
+| The web UI of the panel | the home server | the panel's frame | the web UI's own HTTP, signed in by a one-time ticket from the socket |
+| The tab you write from | the panel | the web UI, then the server | `postMessage` inside the browser, then `metadata.browser` of the message |
+| Page text, elements and screenshots | the extension | the server, then the model provider | results of the `browser` tool |
+| Files | a page or the workspace | the other one | one-time tickets under `/browser/v1/files/`, up to 32 MiB |
+| Calls of another Coddy process | that process | the home server | HTTPS `/coddy/browser/v1` with the home server's API token |
+| Your answers about websites and chats | - | - | they stay in the browser and never reach Coddy |
 
 The wire protocol is documented in Coddy: [Browser protocol](https://coddy.dev/docs/reference/browser-protocol). The feature
 from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.dev/docs/features/browser).
@@ -120,10 +195,16 @@ npm run build
 ## Connect
 
 The settings page opens after the install, and later from the settings button of the side panel (or from the
-extension's entry in the browser's list of extensions). Enter the server
-address (`http://127.0.0.1:12345` for a local server, the address of its web UI), the key and a name for this
-browser, such as `Chrome - laptop`, then press **Save and connect**. The name tells browsers apart when several are
-connected to one server: a chat lists them and selects one.
+extension's entry in the browser's list of extensions). Enter the server address (`http://127.0.0.1:12345` for a
+local server, the address of its web UI), the key and a name for this browser, such as `Chrome - laptop`, then press
+**Save and connect**. The name tells browsers apart when several are connected to one server: a chat lists them and
+selects one.
+
+![The settings page of the extension, connected to Coddy](docs/screenshots/settings-dark-1280.png)
+
+The settings page shows the connection in its corner: green while connected, amber while it connects or retries,
+grey while disconnected, red when the server refused the key or speaks another protocol version. **Disconnect** stops Coddy and closes the
+connection.
 
 ## Use it
 
@@ -132,8 +213,8 @@ Press the toolbar button and write in the side panel, on the page you want Coddy
 > Summarize this page and list the deadlines it mentions.
 
 The panel is the web UI: the answer streams, the tool calls show as they run, Coddy's questions come up in the chat,
-and the chat is an ordinary session you can continue anywhere. The strip over it shows the tab you look at, with
-**Share** and **Take back**, the connection and Stop, in the web UI's theme.
+and the chat is an ordinary session you can continue anywhere. The strip over it shows the tab you look at and whose
+it is, with **Share** and **Take back**, and the settings button, in the web UI's theme.
 
 From any other chat of Coddy, share a tab or let Coddy open one, and ask:
 
@@ -141,8 +222,23 @@ From any other chat of Coddy, share a tab or let Coddy open one, and ask:
 
 The chat calls the `browser` tool: it lists the tabs it may reach, reads a page as text with element references,
 clicks and types (through the debugger in Chrome and Yandex Browser, so the input is trusted like a person's; through
-the page in Firefox), and attaches screenshots when its model reads images. While Coddy works in a tab, the tab glows and shows a Stop button, and the chat's group title
-starts with an hourglass.
+the page in Firefox), and attaches screenshots when its model reads images. While Coddy works in a tab, the tab glows
+and shows a Stop button, and the chat's group title starts with an hourglass.
+
+![A tab Coddy works in, with the glow and the Stop button](docs/screenshots/working-tab-dark-1280.png)
+
+Before the first action on a website, the extension asks in a window of its own, or in the side panel when it is
+open:
+
+<p align="center">
+  <img src="docs/screenshots/site-approval-dark-420.png" width="420" alt="The extension asks whether Coddy may act on a website">
+</p>
+
+A chat of another Coddy process asks first, naming the machine it runs on:
+
+<p align="center">
+  <img src="docs/screenshots/remote-chat-dark-420.png" width="360" alt="A chat of another Coddy asks to use this browser">
+</p>
 
 ## Permissions
 
