@@ -90,9 +90,12 @@ try {
   await options.locator("#site").fill("ftp://example.com");
   await options.getByRole("button", { name: "Add" }).click();
   await options.locator("#site-error").getByText("Only http and https addresses can be allowed").waitFor();
-  await options.locator("#all").check();
+  const every = options.getByRole("switch", { name: "Allow every website without asking" });
+  await every.click();
+  await options.locator('#all[aria-checked="true"]').waitFor();
   await options.locator("#all-note").waitFor();
-  await options.locator("#all").uncheck();
+  await every.click();
+  await options.locator('#all[aria-checked="false"]').waitFor();
   await options.locator("#all-note").waitFor({ state: "hidden" });
   assert.ok(coddy.state.hello.actions.includes("open_tab"));
   assert.deepEqual(coddy.state.tabs, []);

@@ -48,15 +48,17 @@
           addresses are on the list from the start, on any port but your Coddy server's own. A chat from another machine
           asks about every site.
         </p>
-        <label class="check">
-          <input id="all" type="checkbox" />
-          <span>Allow every website without asking</span>
-        </label>
+        <div class="switch-field">
+          <button id="all" type="button" role="switch" aria-checked="false" class="switch" aria-labelledby="all-label">
+            <span class="switch-thumb"></span>
+          </button>
+          <label id="all-label" for="all">Allow every website without asking</label>
+        </div>
         <p id="all-note" class="muted" hidden>
           The chats of your server act on any website without a question. Your Coddy server itself still needs an entry
           with its port, and a chat from another machine still asks.
         </p>
-        <form id="add-site" class="row add-site">
+        <form id="add-site" class="add-site">
           <input
             id="site"
             aria-label="Website to allow"
@@ -64,10 +66,12 @@
             spellcheck="false"
             autocomplete="off"
           />
-          <button type="submit">Add</button>
+          <button type="submit" class="icon framed" title="Add" aria-label="Add">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
         </form>
         <p id="site-error" class="error" role="alert" hidden></p>
-        <ul id="allowed" class="list"></ul>
+        <ul id="allowed" class="list sites"></ul>
       </section>
       <section class="card">
         <h2>How sharing works</h2>

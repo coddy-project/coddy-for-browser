@@ -149,23 +149,95 @@ label {
   margin-bottom: 10px;
   font-weight: 500;
 }
-label.check {
+/* The list of sites: the field, its add button and every row are one height
+   (34px), and their text starts at one inset (11px from the outer edge). The
+   row's trash sits on the add button's centre line. */
+/* A switch as the web UI's Settings draw it: a pill, its thumb at the end that
+   is on, the accent when on. */
+.switch-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 400;
+  gap: 10px;
+  margin: 0 0 10px;
 }
-label.check input {
+.switch-field label {
+  display: inline;
   margin: 0;
-  accent-color: var(--accent);
+  font-weight: 400;
+  cursor: pointer;
+}
+button.switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 28%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 6%, transparent);
+  transition: background 0.18s ease;
+}
+button.switch[aria-checked="true"] {
+  background: var(--accent);
+  box-shadow: none;
+}
+button.switch:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+button.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(16px);
 }
 .add-site {
-  flex-wrap: nowrap;
-  margin-bottom: 10px;
+  display: flex;
+  gap: 6px;
+  margin: 0 0 6px;
 }
 .add-site input {
   flex: 1;
   min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 10px;
+}
+button.icon.framed {
+  width: 34px;
+  height: 34px;
+  border-color: var(--border);
+  background: var(--surface);
+}
+button.icon.framed:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+}
+.list.sites li {
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 2px 2px 2px 10px;
+}
+.list.sites li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.icon.remove:hover {
+  color: var(--danger);
+  border-color: transparent;
+  background: transparent;
 }
 input {
   font: inherit;

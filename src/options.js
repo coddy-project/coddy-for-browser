@@ -1,5 +1,9 @@
 import { request, el, showError, statusClass } from "./ui.js";
 
+// TRASH is the glyph of a row's Revoke button.
+const TRASH =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13M10 11v6M14 11v6" /></svg>';
+
 // siteLabel reads an entry of the list: an origin as it is, a pattern
 // ("<scheme>://<host>:<ports>") as the host, its ports and, when it names one,
 // the scheme.
@@ -34,7 +38,7 @@ async function refresh() {
   }
   $("server").textContent = s.server ? `Connected to Coddy ${s.server.version || ""}`.trim() : "";
   $("version").textContent = `Extension ${s.version}, protocol 1`;
-  $("all").checked = Boolean(s.allowAll);
+  $("all").setAttribute("aria-checked", String(Boolean(s.allowAll)));
   $("all-note").hidden = !s.allowAll;
   const next = JSON.stringify(s.allowed);
   if (next !== allowed) {
@@ -42,7 +46,8 @@ async function refresh() {
     $("allowed").replaceChildren(
       ...(s.allowed.length
         ? s.allowed.map((origin) => {
-            const b = el("button", { type: "button" }, "Revoke");
+            const b = el("button", { type: "button", class: "icon remove", title: "Revoke", "aria-label": "Revoke" });
+            b.innerHTML = TRASH;
             b.onclick = () =>
               request({ type: "revoke", origin })
                 .then(refresh)
@@ -66,8 +71,8 @@ $("connect").onsubmit = async (event) => {
     showError(e);
   }
 };
-$("all").onchange = () =>
-  request({ type: "setAllowAll", on: $("all").checked })
+$("all").onclick = () =>
+  request({ type: "setAllowAll", on: $("all").getAttribute("aria-checked") !== "true" })
     .then(refresh)
     .catch(showError);
 $("add-site").onsubmit = async (event) => {
