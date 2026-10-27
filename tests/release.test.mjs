@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { nextVersion } from "../scripts/next-version.mjs";
 import { publishChrome, CHROME_KEYS } from "../scripts/publish-chrome.mjs";
+import { amoToken, amoHasVersion } from "../scripts/sign.mjs";
+import crypto from "node:crypto";
 
 test("the first release takes the version of package.json", () => {
   assert.equal(nextVersion([], "0.1.0"), "0.1.0");
@@ -95,4 +97,51 @@ test("without the store's credentials nothing is sent", async () => {
   assert.equal(result, null);
   assert.equal(calls.length, 0);
   for (const key of CHROME_KEYS.filter((k) => k !== "CWS_CLIENT_ID")) assert.match(notes.join("\n"), new RegExp(key));
+});
+
+test("a re-run skips a version the Chrome Web Store already holds", async () => {
+  const { fetch, calls } = fakeStore([
+    { body: { access_token: "token" } },
+    { body: { submittedItemRevisionStatus: { state: "PENDING_REVIEW", distributionChannels: [{ crxVersion: "0.1.2" }] } } },
+  ]);
+  const result = await publishChrome({ fetch, env, zip: new Uint8Array([1]), version: "0.1.2", sleep: async () => {}, log: () => {} });
+  assert.equal(result.state, "PENDING_REVIEW");
+  assert.equal(result.already, true);
+  assert.deepEqual(calls.map((c) => c.url), ["https://oauth2.googleapis.com/token", item + ":fetchStatus"]);
+});
+
+test("an older version in the store does not stop the upload", async () => {
+  const { fetch, calls } = fakeStore([
+    { body: { access_token: "token" } },
+    { body: { publishedItemRevisionStatus: { state: "PUBLISHED", distributionChannels: [{ crxVersion: "0.1.1" }] } } },
+    { body: { uploadState: "SUCCEEDED", crxVersion: "0.1.2" } },
+    { body: { state: "PENDING_REVIEW" } },
+  ]);
+  const result = await publishChrome({ fetch, env, zip: new Uint8Array([1]), version: "0.1.2", sleep: async () => {}, log: () => {} });
+  assert.equal(result.state, "PENDING_REVIEW");
+  assert.equal(calls[2].url, "https://chromewebstore.googleapis.com/upload/v2/publishers/pub/items/abcdefghijklmnopabcdefghijklmnop:upload");
+});
+
+test("the AMO token is a JWT signed with the API secret", () => {
+  const token = amoToken({ issuer: "user:1:2", secret: "s3cret", now: 1_700_000_000_000, jti: "nonce" });
+  const [head, body, sig] = token.split(".");
+  const json = (part) => JSON.parse(Buffer.from(part, "base64url").toString());
+  assert.deepEqual(json(head), { alg: "HS256", typ: "JWT" });
+  assert.deepEqual(json(body), { iss: "user:1:2", jti: "nonce", iat: 1_700_000_000, exp: 1_700_000_060 });
+  assert.equal(sig, crypto.createHmac("sha256", "s3cret").update(head + "." + body).digest("base64url"));
+});
+
+test("a re-run asks AMO whether the version is already there", async () => {
+  const seen = [];
+  const answers = { "0.1.2": 200, "0.1.3": 404, "0.1.4": 500 };
+  const fetch = async (url, init) => {
+    seen.push({ url: String(url), auth: init.headers.Authorization });
+    return new Response("{}", { status: answers[String(url).split("/versions/")[1].replace("/", "")] });
+  };
+  const args = { fetch, issuer: "user:1:2", secret: "s3cret" };
+  assert.equal(await amoHasVersion({ ...args, version: "0.1.2" }), true);
+  assert.equal(await amoHasVersion({ ...args, version: "0.1.3" }), false);
+  await assert.rejects(amoHasVersion({ ...args, version: "0.1.4" }), /HTTP 500/);
+  assert.equal(seen[0].url, "https://addons.mozilla.org/api/v5/addons/addon/coddy-for-browser%40coddy.dev/versions/0.1.2/");
+  assert.match(seen[0].auth, /^JWT [\w-]+\.[\w-]+\.[\w-]+$/);
 });

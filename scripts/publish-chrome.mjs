@@ -2,7 +2,12 @@
 // Chrome Web Store and submits it for review, through the Chrome Web Store
 // API v2. The store publishes the version once it passes review.
 //
-//   node scripts/publish-chrome.mjs dist/coddy-for-browser-chrome-<version>.zip
+//   node scripts/publish-chrome.mjs dist/coddy-for-browser-chrome-<version>.zip <version>
+//
+// Given the version, a run first asks the store about it and stops when that
+// version is already in review or published, so the release job that failed
+// can be run again alone. A package uploaded while its submission failed is
+// uploaded once more and submitted.
 //
 // The item has to exist: the first version is uploaded by hand in the
 // developer dashboard, with its store listing and privacy tabs filled in.
@@ -16,6 +21,8 @@ import { fileURLToPath } from "node:url";
 
 export const CHROME_KEYS = ["CWS_CLIENT_ID", "CWS_CLIENT_SECRET", "CWS_REFRESH_TOKEN", "CWS_PUBLISHER_ID", "CWS_EXTENSION_ID"];
 const API = "https://chromewebstore.googleapis.com";
+// SUBMITTED are the states of a revision the store already took.
+const SUBMITTED = new Set(["PENDING_REVIEW", "STAGED", "PUBLISHED", "PUBLISHED_TO_TESTERS"]);
 
 async function answer(res, what) {
   const text = await res.text();
@@ -29,7 +36,7 @@ async function answer(res, what) {
   return body;
 }
 
-export async function publishChrome({ fetch, env, zip, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = console.log }) {
+export async function publishChrome({ fetch, env, zip, version, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = console.log }) {
   const missing = CHROME_KEYS.filter((k) => !env[k]);
   if (missing.length) {
     log(`Chrome Web Store: skipped, set ${missing.join(", ")} to publish there`);
@@ -50,6 +57,16 @@ export async function publishChrome({ fetch, env, zip, sleep = (ms) => new Promi
   );
   const auth = { Authorization: `Bearer ${token.access_token}` };
   const item = `publishers/${encodeURIComponent(env.CWS_PUBLISHER_ID)}/items/${encodeURIComponent(env.CWS_EXTENSION_ID)}`;
+
+  if (version) {
+    const status = await answer(await fetch(`${API}/v2/${item}:fetchStatus`, { headers: auth }), "status");
+    for (const rev of [status.submittedItemRevisionStatus, status.publishedItemRevisionStatus]) {
+      if (rev && SUBMITTED.has(rev.state) && (rev.distributionChannels || []).some((c) => c.crxVersion === version)) {
+        log(`Chrome Web Store: version ${version} is already ${rev.state}, nothing to do`);
+        return { state: rev.state, already: true };
+      }
+    }
+  }
 
   const upload = await answer(
     await fetch(`${API}/upload/v2/${item}:upload`, { method: "POST", headers: { ...auth, "Content-Type": "application/zip" }, body: zip }),
@@ -75,6 +92,6 @@ export async function publishChrome({ fetch, env, zip, sleep = (ms) => new Promi
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const file = process.argv[2];
-  if (!file) throw new Error("usage: publish-chrome.mjs <package.zip>");
-  await publishChrome({ fetch, env: process.env, zip: await fs.readFile(file) });
+  if (!file) throw new Error("usage: publish-chrome.mjs <package.zip> [version]");
+  await publishChrome({ fetch, env: process.env, zip: await fs.readFile(file), version: process.argv[3] });
 }

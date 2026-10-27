@@ -296,6 +296,10 @@ GitHub release and submits them to the Chrome Web Store and addons.mozilla.org, 
 review passes. A direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of
 `main`, or, with a tag given, releases that tag again.
 
+One job builds the packages, and the GitHub release and each store are jobs of their own that take those packages. A
+job that failed is run again alone (**Re-run failed jobs**, or that job's own re-run), and a store job skips a version
+the store already holds, so a release half done is finished without touching what went through.
+
 Each store needs a one-time setup. Until it is done, its job prints what is missing and the release goes out without
 that store.
 
