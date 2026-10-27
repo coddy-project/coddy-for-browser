@@ -120,6 +120,8 @@ listen(window, {
 
 $("settings").onclick = $("open-settings").onclick = () => api.runtime.openOptionsPage();
 
-windowId = Number(new URLSearchParams(location.search).get("window")) || (await api.windows.getCurrent()).id;
+// Firefox for Android has no windows: the panel is a tab, and the page it
+// acts on is the one looked at last.
+windowId = Number(new URLSearchParams(location.search).get("window")) || (await api.windows?.getCurrent())?.id;
 await refresh();
 setInterval(refresh, 1000);

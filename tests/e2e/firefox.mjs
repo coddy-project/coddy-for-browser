@@ -1,6 +1,7 @@
 // The Firefox build in a real Firefox against the mock of Coddy's HTTP
-// server: connect, sites allowed beforehand and every website, the site
-// approval window, open_tab, read the page, act on it through the page
+// server: connect, sites allowed beforehand and every website, the
+// extension's own tab groups (Firefox for Android) over Firefox's tabs, the
+// site approval window, open_tab, read the page, act on it through the page
 // (Firefox has no debugger API), a screenshot through tabs.captureTab, files
 // both ways, the side panel's web UI signed in by its ticket with a turn from
 // the person's tab, a chat of another Coddy asking first, Disconnect.
@@ -124,6 +125,26 @@ try {
   await options.waitForSelector('#all[aria-checked="false"]');
   await options.waitForSelector("#all-note[hidden]");
 
+  // Firefox for Android has no tab groups: the extension's own
+  // (virtualgroups.js) answer the same calls over a real Firefox's tabs, and
+  // a group goes with its last tab.
+  const virtual = await options.evaluate(async (url) => {
+    const { withVirtualGroups } = await import(browser.runtime.getURL("virtualgroups.js"));
+    let kept;
+    const api = withVirtualGroups(browser, { get: async () => kept, set: async (v) => void (kept = structuredClone(v)) });
+    const removed = [];
+    api.tabGroups.onRemoved.addListener((g) => removed.push(g.id));
+    const tab = await api.tabs.create({ url, active: false });
+    const groupId = await api.tabs.group({ tabIds: [tab.id] });
+    await api.tabGroups.update(groupId, { title: "Coddy" });
+    const grouped = (await api.tabs.get(tab.id)).groupId === groupId && (await api.tabGroups.get(groupId)).title === "Coddy";
+    const listed = (await api.tabs.query({})).some((t) => t.id === tab.id && t.groupId === groupId);
+    await browser.tabs.remove(tab.id);
+    await new Promise((r) => setTimeout(r, 300));
+    return { grouped, listed, removed: removed.includes(groupId) };
+  }, coddy.base + "/fixture?virtual");
+  assert.deepEqual(virtual, { grouped: true, listed: true, removed: true });
+
   // open_tab asks about the site in a window of the extension's own.
   const opening = coddy.command("open_tab", { params: { url: coddy.base + "/fixture" } });
   const approval = await extensionPage("approval.html");
@@ -206,7 +227,7 @@ try {
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
+  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, the extension's own tab groups over Firefox's tabs, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
 } catch (e) {
   console.error(e);
   process.exitCode = 1;
