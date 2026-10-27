@@ -1,0 +1,3 @@
+No account needed: the extension connects only to the user's own open-source Coddy server (coddy.dev).
+Without a server: git clone https://github.com/coddy-project/coddy-for-browser, then npm ci --ignore-scripts, npx playwright install chromium, npm run build, npm run e2e. It runs the build in Chromium against a mock server.
+With a real one: install Coddy, set browser.enable: true and browser.token (32+ chars), run coddy serve, enter http://127.0.0.1:12345 and the token in Options.

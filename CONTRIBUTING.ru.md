@@ -85,7 +85,10 @@ Secrets and variables, Actions или `gh variable set AMO_PUBLISH --body true`)
   refresh token для области `https://www.googleapis.com/auth/chromewebstore`, как описано в
   [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api). Репозиторию нужны секреты
   `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` и `CWS_REFRESH_TOKEN` и переменные `CWS_PUBLISHER_ID` (Publisher, Settings в
-  панели) и `CWS_EXTENSION_ID` (id элемента). Яндекс Браузер тоже ставит расширения из Chrome Web Store;
+  панели) и `CWS_EXTENSION_ID` (id элемента). Вкладка Test instructions объясняет ревьюерам, как проверить
+  расширение без сервера Coddy. Поля Username и Password остаются пустыми, а в Additional instructions вручную
+  вставляется `cws/test-instructions.txt`, потому что в API для этой вкладки поля нет. Юнит-тест следит, чтобы файл
+  укладывался в 500 символов вкладки. Яндекс Браузер тоже ставит расширения из Chrome Web Store;
 - **addons.mozilla.org** (`scripts/sign.mjs listed`). API-ключ из кабинета разработчика (Tools, Manage API Keys)
   кладётся в секреты `AMO_JWT_ISSUER` и `AMO_JWT_SECRET`. Первая отправка создаёт страницу дополнения с метаданными из
   `amo/metadata.json`. Каждая версия уходит с заметками из ченджлога и с заметками для ревьюеров Mozilla из

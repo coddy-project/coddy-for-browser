@@ -84,8 +84,10 @@ one-time setup; until it is done, its job prints what is missing and the release
   `https://www.googleapis.com/auth/chromewebstore` scope, as
   [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api) shows. The repository needs the
   secrets `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and `CWS_REFRESH_TOKEN`, and the variables `CWS_PUBLISHER_ID` (Publisher,
-  Settings in the dashboard) and `CWS_EXTENSION_ID` (the item's id). Yandex Browser installs extensions from the
-  Chrome Web Store too.
+  Settings in the dashboard) and `CWS_EXTENSION_ID` (the item's id). The Test instructions tab tells the reviewers how
+  to try the extension without a Coddy server: Username and Password stay empty, and Additional instructions take
+  `cws/test-instructions.txt`, pasted by hand, since the API has no field for them; a unit test keeps the file within
+  the tab's 500 characters. Yandex Browser installs extensions from the Chrome Web Store too.
 - **addons.mozilla.org** (`scripts/sign.mjs listed`). An API key from the developer hub (Tools, Manage API Keys) goes
   into the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. The first submission creates the listing with the metadata of
   `amo/metadata.json`; every version carries its release notes from the changelog and the notes for Mozilla's
