@@ -268,11 +268,11 @@ browser.
 ```bash
 npm test                      # unit tests, Node only
 npm run build                 # dist/chrome, dist/firefox and their archives
-npm i --no-save playwright    # once, for the Chromium run
+npm ci                        # once: Playwright, Puppeteer and web-ext at the versions package-lock.json pins
 npx playwright install chromium
 npm run e2e                   # the Chrome build in a real Chromium against a mock of Coddy
-npm i --no-save puppeteer-core
 npm run e2e:firefox           # the Firefox build in a real Firefox against the same mock
+npm run security              # the security checks of CI (needs Docker or the scanners, and npm ci)
 ```
 
 The icons are rendered from `src/icons/icon-small.svg` (16 and 32 px, the tile fills the icon) and
@@ -285,6 +285,29 @@ screenshots of the extension's pages.
 
 The [CI workflow](.github/workflows/ci.yaml) runs the unit tests, builds both packages as artifacts and runs both
 end-to-end runs on every push and pull request.
+
+### Security checks
+
+A pull request is checked before it lands, and `main` once a week as well:
+
+- [security.yaml](.github/workflows/security.yaml) runs `scripts/security-scan.sh`, which is what `npm run security`
+  runs on a developer's machine: trivy (vulnerable packages of `package-lock.json`, the development tools included,
+  committed secrets, misconfiguration), semgrep (rules for JavaScript, secrets and GitHub Actions over the extension, the
+  scripts and the tests), zizmor (the workflows: expressions a pull request controls, unpinned actions, dangerous
+  triggers) and `web-ext lint`, the validator addons.mozilla.org runs on every submission, over a fresh Firefox build;
+- [codeql.yaml](.github/workflows/codeql.yaml) runs the security queries of CodeQL over the JavaScript and the
+  workflows.
+
+The check fails on a trivy finding of HIGH or above, a semgrep finding of WARNING or above, any zizmor finding and a
+validator error. `SEC_FAIL_TRIVY`, `SEC_FAIL_SEMGREP`, `SEC_FAIL_ZIZMOR` and `SEC_FAIL_AMO` move those thresholds (the
+header of the script lists every knob). The reports land in `dist/security/`, and the findings of trusted runs go to
+code scanning. Each scanner runs from its binary on `PATH` or from an image pinned by digest, so a local run needs
+Docker or the binaries, and `npm ci` for web-ext. An accepted trivy finding goes into `.trivyignore.yaml` with a
+statement and an expiry; a semgrep finding is suppressed where it is, with a `nosemgrep` comment that says why.
+
+A pull request from a fork runs with a read-only token and none of the repository's secrets. Only the release jobs use
+the store credentials, and they run on `main`. Every action is pinned to a commit, no checkout keeps credentials in
+`.git`, and the tools come from `package-lock.json` without install scripts.
 
 ### Releases
 
@@ -329,6 +352,7 @@ that store.
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | What runs in a page, input through the DevTools protocol (Chrome) or through the page (Firefox), the working indicator. |
 | `scripts/build.mjs` | The build of each browser family (the Firefox manifest is Manifest V2). |
 | `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | The version of the next release, the upload to the Chrome Web Store and the submission to addons.mozilla.org. |
+| `scripts/security-scan.sh` | The security checks of CI and of `npm run security`. |
 
 A change to the protocol goes to both repositories: the extension and `external/browser` in coddy-agent, with the
 protocol page updated in the same change.

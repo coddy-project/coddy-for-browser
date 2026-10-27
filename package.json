@@ -13,6 +13,12 @@
     "test": "node --test --test-timeout=30000 tests/*.test.mjs",
     "e2e": "node tests/e2e/run.mjs",
     "e2e:firefox": "node tests/e2e/firefox.mjs",
-    "icons": "node scripts/render-icons.mjs"
+    "icons": "node scripts/render-icons.mjs",
+    "security": "bash scripts/security-scan.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "puppeteer-core": "25.16.0",
+    "web-ext": "10.8.0"
   }
 }

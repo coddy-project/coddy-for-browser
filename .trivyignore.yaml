@@ -1,0 +1,8 @@
+# Accepted trivy findings, each with a statement and an expiry, so the list
+# rots instead of silently pardoning new issues:
+# https://trivy.dev/latest/docs/configuration/filtering/#trivyignoreyaml
+# Path exclusions live in trivy.yaml.
+vulnerabilities: []
+misconfigurations: []
+secrets: []
+licenses: []

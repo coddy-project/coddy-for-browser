@@ -277,11 +277,11 @@ Coddy появляются в чате, а сам чат - обычная сес
 ```bash
 npm test                      # модульные тесты, только Node
 npm run build                 # dist/chrome, dist/firefox и их архивы
-npm i --no-save playwright    # один раз, для прогона в Chromium
+npm ci                        # один раз: Playwright, Puppeteer и web-ext тех версий, что закреплены в package-lock.json
 npx playwright install chromium
 npm run e2e                   # сборка для Chrome в настоящем Chromium против имитации Coddy
-npm i --no-save puppeteer-core
 npm run e2e:firefox           # сборка для Firefox в настоящем Firefox против той же имитации
+npm run security              # проверки безопасности из CI (нужны Docker или сами сканеры и npm ci)
 ```
 
 Иконки рисует `npm run icons` (нужен Playwright) из `src/icons/icon-small.svg` (16 и 32 px, плитка на всю иконку) и
@@ -294,6 +294,30 @@ Google Chrome или Яндекс Браузер. Такой браузер по
 
 [CI](.github/workflows/ci.yaml) на каждый пуш и пул-реквест запускает модульные тесты, собирает оба пакета в
 артефакты и прогоняет обе сквозные проверки.
+
+### Проверки безопасности
+
+Пул-реквест проверяется до слияния, а `main` ещё и раз в неделю. Проверок две:
+
+- [security.yaml](.github/workflows/security.yaml) запускает `scripts/security-scan.sh`, тот же скрипт, что и
+  `npm run security` у разработчика. В нём trivy (уязвимые пакеты из `package-lock.json` вместе с инструментами
+  разработки, закоммиченные секреты, ошибки конфигурации), semgrep (правила для JavaScript, секретов и GitHub Actions по
+  расширению, скриптам и тестам), zizmor (воркфлоу - выражения, которыми управляет пул-реквест, незакреплённые
+  действия, опасные триггеры) и `web-ext lint`, валидатор, которым addons.mozilla.org проверяет каждую отправку, по
+  свежей сборке для Firefox;
+- [codeql.yaml](.github/workflows/codeql.yaml) прогоняет запросы безопасности CodeQL по JavaScript и воркфлоу.
+
+Проверка падает, если trivy нашёл что-то уровня HIGH и выше, semgrep - уровня WARNING и выше, zizmor - что угодно, а
+валидатор - ошибку. Пороги меняют `SEC_FAIL_TRIVY`, `SEC_FAIL_SEMGREP`, `SEC_FAIL_ZIZMOR` и `SEC_FAIL_AMO`, все
+настройки перечислены в заголовке скрипта. Отчёты складываются в `dist/security/`, а находки доверенных прогонов
+уходят в code scanning. Каждый сканер запускается из своего бинарника в `PATH` или из образа, закреплённого по
+дайджесту, поэтому локально нужен Docker или сами сканеры, а для web-ext ещё `npm ci`. Принятая находка trivy
+записывается в `.trivyignore.yaml` с обоснованием и сроком, находка semgrep гасится на месте комментарием `nosemgrep`
+с причиной.
+
+Пул-реквест из форка работает с токеном только на чтение и без секретов репозитория. Ключи магазинов нужны только
+заданиям релиза, а они запускаются на `main`. Каждое действие закреплено на коммите, ни один checkout не оставляет
+учётных данных в `.git`, а инструменты ставятся из `package-lock.json` без install-скриптов.
 
 ### Релизы
 
@@ -339,6 +363,7 @@ GitHub и отправляет их в Chrome Web Store и на addons.mozilla.o
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | Что выполняется на странице, ввод через протокол DevTools (Chrome) или через страницу (Firefox), индикатор работы. |
 | `scripts/build.mjs` | Сборка для каждого семейства браузеров (манифест Firefox - Manifest V2). |
 | `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | Версия следующего релиза, загрузка в Chrome Web Store и отправка на addons.mozilla.org. |
+| `scripts/security-scan.sh` | Проверки безопасности для CI и `npm run security`. |
 
 Изменение протокола вносится в оба репозитория, в расширение и в `external/browser` в coddy-agent, вместе со страницей
 протокола в том же изменении.

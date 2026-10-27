@@ -1,0 +1,9 @@
+# What semgrep must not scan. The file replaces semgrep's default list, so
+# the tests are scanned too; the entries are only what a local tree holds
+# and a fresh checkout does not (the docker fallback of
+# scripts/security-scan.sh mounts the checkout, where .gitignore may not be
+# read).
+.git/
+node_modules/
+dist/
+screenshots/

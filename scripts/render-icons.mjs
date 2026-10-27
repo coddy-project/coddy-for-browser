@@ -4,7 +4,7 @@
 // stores ask: 48 and 128 px). Every size is rasterized from the vector, never
 // scaled down from a larger picture, so the small ones stay sharp.
 //
-//   npm i --no-save playwright && npx playwright install chromium
+//   npm ci && npx playwright install chromium
 //   npm run icons
 import fs from "node:fs/promises";
 import path from "node:path";

@@ -1,0 +1,89 @@
+# The security gate: trivy, semgrep, zizmor and the validator of
+# addons.mozilla.org, all through scripts/security-scan.sh (`npm run
+# security`), so a failure here reproduces on a developer's machine with one
+# command. It runs on every pull request, on pushes to main (a fresh baseline
+# for code scanning, so a pull request shows only what it adds) and weekly (a
+# clean dependency gains a CVE without any commit). CodeQL is codeql.yaml.
+
+name: Security scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Security scanners
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      # The AMO validator is the web-ext of package-lock.json; no install
+      # script runs.
+      - run: npm ci --ignore-scripts
+      - name: Run trivy, semgrep, zizmor and the AMO validator
+        env:
+          # zizmor's online audits (known vulnerable actions, impostor
+          # commits) read the public API; a fork's token is read-only.
+          GH_TOKEN: ${{ github.token }}
+        run: npm run security
+
+      # SARIF goes to code scanning only from trusted events: a fork must
+      # never write findings into this repository's code-scanning history.
+      # always(), so a tripped gate still publishes the report that tripped it.
+      - name: Upload trivy SARIF
+        if: >-
+          always() &&
+          !(github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name != github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: dist/security/trivy.sarif
+          category: trivy
+      - name: Upload semgrep SARIF
+        if: >-
+          always() &&
+          !(github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name != github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: dist/security/semgrep.sarif
+          category: semgrep
+      - name: Upload zizmor SARIF
+        if: >-
+          always() &&
+          !(github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name != github.repository)
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: dist/security/zizmor.sarif
+          category: zizmor
+
+      # The reports themselves, for a fork's pull request too.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            dist/security/
+            !dist/security/.cache/
+          retention-days: 30
+      - name: Job summary
+        if: always()
+        run: cat dist/security/summary.md >> "$GITHUB_STEP_SUMMARY" || true

@@ -61,7 +61,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const out = path.join(root, "dist", "signed");
   await fs.rm(out, { recursive: true, force: true });
-  const args = ["--yes", "web-ext@8", "sign", "--channel", channel, "--source-dir", source, "--artifacts-dir", out];
+  // web-ext is the version package-lock.json pins (npm ci), never a download.
+  const args = ["--no-install", "web-ext", "sign", "--channel", channel, "--source-dir", source, "--artifacts-dir", out];
   // A listed version waits for Mozilla's review, which takes longer than a
   // workflow should; the submission is enough.
   if (channel === "listed") args.push("--amo-metadata", path.join(root, "amo", "metadata.json"), "--approval-timeout", "0");

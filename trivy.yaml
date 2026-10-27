@@ -1,0 +1,9 @@
+# Trivy configuration of the repository scan, read by scripts/security-scan.sh
+# from the root (binary or docker alike). Trivy does not honour .gitignore, so
+# the directories a fresh checkout does not hold are skipped here.
+scan:
+  skip-dirs:
+    - .git
+    - node_modules
+    - dist
+    - screenshots
