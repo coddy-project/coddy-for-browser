@@ -202,8 +202,22 @@ button.switch[aria-checked="true"] .switch-thumb {
 }
 .add-site {
   display: flex;
-  gap: 6px;
-  margin: 0 0 6px;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+/* The card of the sites allowed always keeps one step between its blocks -
+   the description, the switch, the field, the list - and a smaller one
+   between the rows of the list. The field's error sits under the field it
+   belongs to. */
+.sites-card > p,
+.sites-card > .switch-field {
+  margin: 0 0 10px;
+}
+.list.sites {
+  gap: 8px;
+}
+#site-error {
+  margin: -4px 0 10px;
 }
 .add-site input {
   flex: 1;

@@ -90,6 +90,21 @@ try {
   await options.locator("#site").fill("ftp://example.com");
   await options.getByRole("button", { name: "Add" }).click();
   await options.locator("#site-error").getByText("Only http and https addresses can be allowed").waitFor();
+  // The card keeps one step of 10 px between its blocks and 8 px between the
+  // rows of the list; the error sits under its field, closer to it than to
+  // the list.
+  const gaps = await options.evaluate(() => {
+    const box = (sel) => document.querySelector(sel).getBoundingClientRect();
+    const rows = [...document.querySelectorAll("#allowed li")].map((li) => li.getBoundingClientRect());
+    return {
+      description: Math.round(box(".sites-card .switch-field").top - box(".sites-card > p.muted").bottom),
+      field: Math.round(box("#add-site").top - box(".sites-card .switch-field").bottom),
+      error: Math.round(box("#site-error").top - box("#add-site").bottom),
+      list: Math.round(box("#allowed").top - box("#site-error").bottom),
+      rows: [...new Set(rows.slice(1).map((r, i) => Math.round(r.top - rows[i].bottom)))],
+    };
+  });
+  assert.deepEqual(gaps, { description: 10, field: 10, error: 6, list: 10, rows: [8] });
   const every = options.getByRole("switch", { name: "Allow every website without asking" });
   await every.click();
   await options.locator('#all[aria-checked="true"]').waitFor();
