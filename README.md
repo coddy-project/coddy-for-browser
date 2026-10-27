@@ -260,7 +260,8 @@ A chat of another Coddy process asks first, naming the machine it runs on:
 | `http://*/*`, `https://*/*` | Act on the websites you allow, and reach your Coddy server. Firefox asks for `<all_urls>` instead, which its screenshot of a tab (`tabs.captureTab`) needs; the extension still acts on web pages only. |
 
 The extension sends nothing anywhere but your Coddy server. Pages Coddy reads still reach the model provider your
-Coddy server is configured with.
+Coddy server is configured with. The [privacy policy](PRIVACY.md) lists what goes to the server and what stays in the
+browser.
 
 ## Develop
 
