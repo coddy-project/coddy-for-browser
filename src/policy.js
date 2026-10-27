@@ -43,12 +43,40 @@ export function fileURL(server, ticket) {
   return serverURL(server) + "/browser/v1/files/" + ticket;
 }
 
+// isLocalOrigin says whether an origin is on this machine: localhost and its
+// subdomains, 127.0.0.0/8 and [::1], on any port.
+export function isLocalOrigin(origin) {
+  let host;
+  try {
+    host = new URL(origin).hostname;
+  } catch {
+    return false;
+  }
+  return host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127(\.\d{1,3}){3}$/.test(host);
+}
+
 // Grants say which websites Coddy may act on without asking: always, or for
 // the rest of one chat (until the browser restarts).
 // granted reports whether origin may be acted on for the chat. An "always"
-// covers the chats of the connected server, never a remote one.
-export function granted(origin, sessionId, grants, { remote = false } = {}) {
-  return (!remote && grants.always.includes(origin)) || (grants.chats[sessionId] || []).includes(origin);
+// covers the chats of the connected server, never a remote one, and so do
+// local addresses while grants.local is on - all but home, the Coddy server
+// itself, whose web UI a chat must not drive without the person's word.
+export function granted(origin, sessionId, grants, { remote = false, home = "" } = {}) {
+  if ((grants.chats[sessionId] || []).includes(origin)) return true;
+  if (remote) return false;
+  if (grants.always.includes(origin)) return true;
+  return grants.local !== false && isLocalOrigin(origin) && !sameServer(origin, home);
+}
+
+// sameServer says whether origin reaches the server at home: the same origin,
+// or for a local home the same port under any of this machine's names
+// (http://localhost:12345 is the web UI of http://127.0.0.1:12345).
+function sameServer(origin, home) {
+  if (!home) return false;
+  if (origin === home) return true;
+  if (!isLocalOrigin(home)) return false;
+  const port = (u) => u.port || (u.protocol === "https:" ? "443" : "80");
+  return port(new URL(origin)) === port(new URL(home));
 }
 
 export function grant(grants, origin, sessionId, scope) {

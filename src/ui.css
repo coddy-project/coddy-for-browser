@@ -75,6 +75,13 @@ h2 {
 p {
   margin: 0 0 8px;
 }
+/* The settings page: the server's answer sits apart from the buttons above it. */
+#server {
+  margin: 14px 0 0;
+}
+#server:empty {
+  display: none;
+}
 .status {
   margin-left: auto;
   font-size: 12px;
@@ -141,6 +148,16 @@ label {
   gap: 4px;
   margin-bottom: 10px;
   font-weight: 500;
+}
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+label.check input {
+  margin: 0;
+  accent-color: var(--accent);
 }
 input {
   font: inherit;

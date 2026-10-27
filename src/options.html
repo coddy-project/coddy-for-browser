@@ -45,8 +45,15 @@
         <h2>Always allowed websites</h2>
         <p class="muted">
           The chats of your server act on these sites without asking; every other site asks first. A chat from another
-          machine asks about every site.
+          machine asks about every site, local ones included.
         </p>
+        <label class="check">
+          <input id="local" type="checkbox" />
+          <span
+            >Local addresses: <code>localhost</code>, <code>127.0.0.1</code> and <code>[::1]</code> on any port, except
+            your Coddy server</span
+          >
+        </label>
         <ul id="allowed" class="list"></ul>
       </section>
       <section class="card">

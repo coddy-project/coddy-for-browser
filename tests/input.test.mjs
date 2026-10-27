@@ -56,6 +56,33 @@ test("two first actions on a tab share one debugger attachment", async () => {
   await dbg.detachAll();
 });
 
+test("a tab DevTools already debugs is used as it is and never detached by the extension", async () => {
+  const detached = [];
+  const api = {
+    debugger: {
+      onDetach: { addListener() {} },
+      // Chrome's own wording, lower case.
+      attach: async () => {
+        throw new Error("Another debugger is already attached to the tab with id: 7.");
+      },
+      detach: async (target) => detached.push(target.tabId),
+      sendCommand: async () => ({}),
+    },
+  };
+  const dbg = new Debugger(api);
+  const entry = await dbg.attach(7);
+  assert.equal(entry.own, false);
+  await dbg.detachAll();
+  assert.deepEqual(detached, []);
+
+  // Any other failure is the action's error, and nothing is left recorded.
+  api.debugger.attach = async () => {
+    throw new Error("Cannot access a chrome:// URL");
+  };
+  await assert.rejects(dbg.attach(8), /chrome:\/\//);
+  assert.equal(dbg.attached.has(8), false);
+});
+
 test("a stopped multi-step action sends no further step, and a drag still releases", async () => {
   const dbg = fakeDebugger();
   let stopped = false;

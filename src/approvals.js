@@ -14,12 +14,15 @@ export class Approvals {
   // sessionStore keeps what one chat was allowed, until the browser closes
   // (it falls back to store when there is none). onChange is called whenever
   // the queue changes, so the badge and the approval window follow it.
-  constructor({ store, sessionStore = store, onChange = () => {}, timeoutMs = TIMEOUT_MS }) {
+  // home() is the origin of the connected Coddy server, which local addresses
+  // never cover.
+  constructor({ store, sessionStore = store, onChange = () => {}, timeoutMs = TIMEOUT_MS, home = () => "" }) {
     this.store = store;
+    this.home = home;
     this.sessionStore = sessionStore;
     this.onChange = onChange;
     this.timeoutMs = timeoutMs;
-    this.grants = { always: [], chats: {}, remote: [] };
+    this.grants = { always: [], local: true, chats: {}, remote: [] };
     this.pending = new Map();
     this.nextID = 1;
   }
@@ -27,21 +30,26 @@ export class Approvals {
   async load() {
     const kept = (await this.store.get()) || {};
     const session = this.sessionStore === this.store ? kept : (await this.sessionStore.get()) || {};
-    this.grants = { always: kept.always || [], chats: session.chats || {}, remote: session.remote || [] };
+    this.grants = {
+      always: kept.always || [],
+      local: kept.local !== false,
+      chats: session.chats || {},
+      remote: session.remote || [],
+    };
     this.loaded = true;
   }
 
   // persist writes the grants where each kind lives.
   async persist() {
     if (this.sessionStore === this.store) return this.store.set(this.grants);
-    await this.store.set({ always: this.grants.always });
+    await this.store.set({ always: this.grants.always, local: this.grants.local });
     await this.sessionStore.set({ chats: this.grants.chats, remote: this.grants.remote });
   }
 
   // allowed reports whether origin may be acted on for the chat; an "always"
   // covers the chats of the connected server only.
   allowed(origin, session) {
-    return granted(origin, session.id, this.grants, { remote: Boolean(session.node) });
+    return granted(origin, session.id, this.grants, { remote: Boolean(session.node), home: this.home() });
   }
 
   // chatAllowed reports whether a chat may use this browser at all: every
@@ -136,6 +144,12 @@ export class Approvals {
     const p = this.pending.get(id);
     if (!p) throw new Error("The question was already answered or expired");
     await p.decide(choice);
+  }
+
+  // setLocal turns on or off the local addresses allowed without asking.
+  async setLocal(on) {
+    this.grants = { ...this.grants, local: Boolean(on) };
+    await this.persist();
   }
 
   async revoke(origin) {

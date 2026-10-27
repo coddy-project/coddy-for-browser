@@ -8,7 +8,7 @@
 import { api } from "./platform.js";
 import { request, el, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
-import { frameURL, listen } from "./frame.js";
+import { frameURL, listen, textOn } from "./frame.js";
 
 const $ = (id) => document.getElementById(id);
 // The worker counts open panels: a website question shows here instead of a
@@ -98,6 +98,8 @@ function applyTheme(theme) {
   root.dataset.theme = theme.scheme;
   root.style.colorScheme = theme.scheme;
   for (const key of ["bg", "surface", "border", "text", "muted", "accent"]) root.style.setProperty(`--${key}`, theme[key]);
+  // The text on an accent button follows the accent it sits on.
+  root.style.setProperty("--accent-text", textOn(theme.accent) || "");
 }
 
 listen(window, {

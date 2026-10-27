@@ -78,6 +78,27 @@ test("a site allowed always outlives the browser, a chat's answer does not", asy
   await a.load();
   await a.allow("https://always.example", "s1", "always");
   await a.allow("https://chat.example", "s1", "chat");
-  assert.deepEqual(store.peek(), { always: ["https://always.example"] });
+  assert.deepEqual(store.peek(), { always: ["https://always.example"], local: true });
   assert.deepEqual(session.peek().chats, { s1: ["https://chat.example"] });
+});
+
+test("local pages go ahead without asking until the switch is off, and the Coddy server always asks", async () => {
+  const store = memoryStore();
+  const a = new Approvals({ store, sessionStore: memoryStore(), home: () => "http://127.0.0.1:12345" });
+  await a.load();
+  await a.ensure("http://localhost:5173", { id: "s1" }, "click");
+  assert.equal(a.list().length, 0);
+  const own = a.ensure("http://localhost:12345", { id: "s1" }, "click");
+  assert.equal(a.list().length, 1);
+  a.cancelAll();
+  await assert.rejects(own);
+
+  await a.setLocal(false);
+  assert.equal(store.peek().local, false);
+  const b = new Approvals({ store, sessionStore: memoryStore() });
+  await b.load();
+  const asked = b.ensure("http://localhost:5173", { id: "s1" }, "click");
+  assert.equal(b.list().length, 1);
+  b.cancelAll();
+  await assert.rejects(asked);
 });

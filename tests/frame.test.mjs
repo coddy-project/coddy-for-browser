@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { frameURL, listen, themeOf, PANEL_SOURCE, WEBUI_SOURCE } from "../src/frame.js";
+import { frameURL, listen, themeOf, PANEL_SOURCE, WEBUI_SOURCE, textOn } from "../src/frame.js";
 
 const theme = {
   scheme: "dark",
@@ -55,4 +55,16 @@ test("the panel answers the web UI at its origin alone", async () => {
   assert.equal(answer.source, PANEL_SOURCE);
   assert.equal(answer.requestId, "r1");
   assert.equal(answer.tab.tab_id, 3);
+});
+
+test("the text on an accent button is the one that reads better on it", () => {
+  // The web UI's dark accent and its colour-mix form take white text.
+  assert.equal(textOn("rgb(147, 51, 234)"), "#ffffff");
+  assert.equal(textOn("color(srgb 0.58 0.2 0.92)"), "#ffffff");
+  // A light accent takes the dark one.
+  assert.equal(textOn("rgb(167, 139, 250)"), "#15121f");
+  assert.equal(textOn("rgba(255, 255, 255, 1)"), "#15121f");
+  // Anything that is not a computed colour is refused.
+  assert.equal(textOn("url(x)"), null);
+  assert.equal(textOn(""), null);
 });

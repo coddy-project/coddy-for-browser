@@ -35,6 +35,7 @@ const approvals = new Approvals({
   store: storeOf("local", "grants"),
   sessionStore: storeOf("session", "chatGrants"),
   onChange: () => void approvalsChanged(),
+  home: () => settings.address || "",
 });
 const commands = new Commands({
   api,
@@ -205,6 +206,7 @@ async function state(msg = {}) {
     chats: groups.chats(),
     pending: approvals.list(),
     allowed: approvals.grants.always,
+    local: approvals.grants.local,
     version,
   };
 }
@@ -258,6 +260,9 @@ const handlers = {
   },
   async revoke({ origin }) {
     await approvals.revoke(origin);
+  },
+  async setLocal({ on }) {
+    await approvals.setLocal(on);
   },
 };
 

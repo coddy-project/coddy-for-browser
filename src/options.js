@@ -22,6 +22,7 @@ async function refresh() {
   }
   $("server").textContent = s.server ? `Connected to Coddy ${s.server.version || ""}`.trim() : "";
   $("version").textContent = `Extension ${s.version}, protocol 1`;
+  $("local").checked = s.local !== false;
   const next = JSON.stringify(s.allowed);
   if (next !== allowed) {
     allowed = next;
@@ -52,6 +53,10 @@ $("connect").onsubmit = async (event) => {
     showError(e);
   }
 };
+$("local").onchange = () =>
+  request({ type: "setLocal", on: $("local").checked })
+    .then(refresh)
+    .catch(showError);
 $("disconnect").onclick = () =>
   request({ type: "disconnect" })
     .then(refresh)
