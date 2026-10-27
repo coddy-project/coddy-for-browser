@@ -33,6 +33,7 @@ export function manifests(m, v) {
   delete firefox.minimum_chrome_version;
   delete firefox.side_panel;
   delete firefox.host_permissions;
+  delete firefox.optional_host_permissions;
   firefox.browser_action = firefox.action;
   delete firefox.action;
   // A persistent background page, as a module like Chrome's service worker:

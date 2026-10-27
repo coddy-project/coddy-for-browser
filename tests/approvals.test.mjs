@@ -121,3 +121,45 @@ test("addresses added beforehand and every website are kept across restarts", as
   await b.ensure("https://elsewhere.example", { id: "s1" }, "click");
   assert.equal(b.list().length, 0);
 });
+
+test("a site allowed here that the browser keeps closed is asked about again, and only the browser's grant answers it", async () => {
+  const open = new Set();
+  const store = memoryStore();
+  const a = new Approvals({ store, sessionStore: memoryStore(), timeoutMs: 1000, access: async (origin) => open.has(origin) });
+  await a.load();
+  await a.addAlways("https://example.com");
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  // The answer came without the browser's grant: the extension cannot act there.
+  const first = a.ensure("https://example.com", { id: "s1" }, "click");
+  await tick();
+  assert.equal(a.list().length, 1);
+  await a.decide(a.list()[0].id, "chat");
+  await assert.rejects(first, (e) => e.reason === "site_declined" && /browser/.test(e.message));
+
+  // The page that took the answer asked the browser, which granted it.
+  const second = a.ensure("https://example.com", { id: "s1" }, "click");
+  await tick();
+  open.add("https://example.com");
+  await a.decide(a.list()[0].id, "chat");
+  await second;
+  await a.ensure("https://example.com", { id: "s2" }, "click");
+  assert.equal(a.list().length, 0);
+});
+
+test("an answer settles another question only where the browser lets the extension in", async () => {
+  const open = new Set(["https://a.example"]);
+  const a = new Approvals({ store: memoryStore(), sessionStore: memoryStore(), timeoutMs: 1000, access: async (origin) => open.has(origin) });
+  await a.load();
+  await a.addAlways("https://b.example");
+  const one = a.ensure("https://a.example", { id: "s1" }, "click");
+  const two = a.ensure("https://b.example", { id: "s1" }, "click");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(a.list().length, 2);
+  await a.decide(a.list().find((q) => q.origin === "https://a.example").id, "always");
+  await one;
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(a.list().map((q) => q.origin), ["https://b.example"]);
+  a.cancelAll();
+  await assert.rejects(two);
+});

@@ -31,7 +31,9 @@ removes them.
 ## What the extension does not do
 
 - It collects no analytics or telemetry and shows no advertising.
-- It does not reach tabs outside its tab groups, and it does not act on a website before you allow it.
+- It does not reach tabs outside its tab groups, and it does not act on a website before you allow it. In Chrome and
+  Yandex Browser it has no access to any website beyond your own machine until you allow that website in the
+  browser's prompt.
 - It does not sell or transfer data to third parties, and it does not use data for any purpose other than letting your
   Coddy work in your browser.
 

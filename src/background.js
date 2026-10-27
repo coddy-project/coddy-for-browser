@@ -11,6 +11,7 @@ import { Debugger, cdpInput } from "./input.js";
 import { pageInput } from "./pageinput.js";
 import { indicator } from "./indicator.js";
 import { api, action, capabilities } from "./platform.js";
+import { hasAccess } from "./access.js";
 import { serverURL, checkKey, checkName, isWebPage, siteEntry } from "./policy.js";
 
 const version = api.runtime.getManifest().version;
@@ -36,6 +37,7 @@ const approvals = new Approvals({
   sessionStore: storeOf("session", "chatGrants"),
   onChange: () => void approvalsChanged(),
   home: () => settings.address || "",
+  access: (origin) => hasAccess(api, origin),
 });
 const commands = new Commands({
   api,
@@ -44,6 +46,7 @@ const commands = new Commands({
   settings: () => settings,
   grant: () => grant,
   publish: () => publish(),
+  access: (origin) => hasAccess(api, origin),
 });
 // Input through the debugger where the browser has it, through the page
 // where it has not (Firefox).

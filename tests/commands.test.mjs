@@ -7,7 +7,7 @@ import { cdpInput } from "../src/input.js";
 import { pageInput } from "../src/pageinput.js";
 import { fakeChrome, fakeDebugger, memoryStore } from "./fake-chrome.mjs";
 
-async function setup({ allow = ["https://example.com", "https://example.org"] } = {}) {
+async function setup({ allow = ["https://example.com", "https://example.org"], access } = {}) {
   const api = fakeChrome();
   const groups = new Groups(api, memoryStore());
   await groups.load();
@@ -25,6 +25,7 @@ async function setup({ allow = ["https://example.com", "https://example.org"] } 
     settings: () => ({ address: "http://127.0.0.1:12348", key: "k".repeat(32) }),
     grant: () => grant.value,
     publish: async () => void published++,
+    access,
     fetch: async (url, init = {}) => {
       fetches.push([url, init]);
       if (url.includes("/browser/v1/files/") && (init.method || "GET") === "GET")
@@ -134,6 +135,18 @@ test("files move through the listener's one-time tickets with the key", async ()
   assert.equal(fetches[1][1].redirect, "error");
   assert.equal(fetches[2][1].method, "POST");
   await assert.rejects(commands.handle(cmd("upload_file", tab.id, { ref: "n:1", transfer_id: "../x" })));
+});
+
+test("a file transfer the browser would block fails before any request", async () => {
+  const { groups, commands, fetches } = await setup({ access: async (origin) => origin !== "http://127.0.0.1:12348" });
+  const tab = await groups.open("https://example.com/", chat);
+  const ticket = "a".repeat(48);
+  for (const [action, params] of [
+    ["upload_file", { ref: "n:1", transfer_id: ticket, filename: "x.txt" }],
+    ["download_file", { url: "/file.bin", transfer_id: ticket, filename: "f" }],
+  ])
+    await assert.rejects(commands.handle(cmd(action, tab.id, params)), (e) => e.reason === "transfer_failed" && /settings/.test(e.message), action);
+  assert.deepEqual(fetches, []);
 });
 
 test("navigate to another site asks about that site too, back and forward included", async () => {
