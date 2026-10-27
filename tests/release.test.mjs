@@ -227,3 +227,12 @@ test("the version of package.json has its section in CHANGELOG.md, and the revie
   assert.ok(approval.length <= 3000, `amo/approval-notes.txt has ${approval.length} characters, AMO takes 3000`);
   assert.ok(plainText(section).length <= 3000, `the release notes of ${version} have ${plainText(section).length} characters`);
 });
+
+test("the reviewers of the Chrome Web Store have their test instructions within the dashboard's limit", async () => {
+  const instructions = (await fs.readFile(new URL("../cws/test-instructions.txt", import.meta.url), "utf8")).trim();
+  assert.match(instructions, /npm run e2e/);
+  // The Test instructions tab of the developer dashboard takes 500 characters
+  // of additional instructions. The API has no field for them, so they are
+  // pasted there by hand (CONTRIBUTING.md, Releases).
+  assert.ok(instructions.length <= 500, `cws/test-instructions.txt has ${instructions.length} characters, the dashboard takes 500`);
+});
