@@ -52,6 +52,7 @@ const commands = new Commands({
   grant: () => grant,
   publish: () => publish(),
   access: (origin) => hasAccess(api, origin),
+  foreground: !caps.windows,
 });
 // Input through the debugger where the browser has it, through the page
 // where it has not (Firefox).
@@ -201,17 +202,27 @@ async function stop() {
   }
 }
 
+// recent holds the ids of the tabs brought forward, the last one first: the
+// page looked at last where a tab does not say when (Firefox for Android has
+// no lastAccessed).
+let recent = [];
+const recency = (tab) => {
+  const i = recent.indexOf(tab.id);
+  return i < 0 ? recent.length : i;
+};
+
 // currentTab is the page the person looks at in a window: its active tab, or,
 // when that is a page of the extension itself (the panel opened as a tab), the
-// web page they looked at last.
+// web page they looked at last. Without windows (Firefox for Android, where
+// every tab is a window of its own) that is any tab.
 async function currentTab(windowId) {
-  const tabs = await tabApi.tabs.query(windowId ? { windowId } : { lastFocusedWindow: true });
+  const tabs = await tabApi.tabs.query(windowId ? { windowId } : caps.windows ? { lastFocusedWindow: true } : {});
   const active = tabs.find((t) => t.active);
   if (active && isWebPage(active.url || "")) return active;
   if (active && !active.url?.startsWith(api.runtime.getURL(""))) return active;
   return tabs
     .filter((t) => isWebPage(t.url || ""))
-    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0) || recency(a) - recency(b))[0];
 }
 
 async function state(msg = {}) {
@@ -340,7 +351,11 @@ tabApi.tabs.onUpdated.addListener((id, info, tab) =>
 );
 api.tabs.onRemoved.addListener((id) => {
   if (id === approvalTab) approvalTab = null;
+  recent = recent.filter((t) => t !== id);
   void whenReady(publishSoon);
+});
+api.tabs.onActivated.addListener(({ tabId }) => {
+  recent = [tabId, ...recent.filter((t) => t !== tabId)].slice(0, 100);
 });
 api.tabs.onAttached?.addListener(() => whenReady(publishSoon));
 tabApi.tabGroups.onRemoved.addListener((group) =>

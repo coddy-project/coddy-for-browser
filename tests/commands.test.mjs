@@ -225,7 +225,9 @@ test("without the debugger, input and screenshots go through the page", async ()
   api.tabs.captureTab = async (tabId, opts) => (captured.push([tabId, opts]), "data:image/png;base64,iVBORw0KGgo=");
   commands.input = pageInput(api, (tabId, action, params) => commands.script(tabId, action, params));
   api.scripting.results["pageAction:input"] = (p) => ({ ok: true, trusted: false, kind: p.kind, origin: p.expected_origin });
-  const tab = api.addTab("https://example.com/");
+  // The page is 800 CSS pixels wide in a tab 400 pixels wide: laid out wider
+  // than the screen, as Firefox for Android does without a viewport tag.
+  const tab = api.addTab("https://example.com/", "Example", { width: 400 });
   await groups.share(tab.id);
   const clicked = await commands.handle(cmd("click", tab.id, { x: 5, y: 6 }));
   assert.equal(clicked.kind, "click");
@@ -233,7 +235,7 @@ test("without the debugger, input and screenshots go through the page", async ()
   assert.equal(clicked.origin, "https://example.com");
   const shot = await commands.handle(cmd("screenshot", tab.id));
   assert.match(shot.dataUrl, /^data:image\/png;base64,/);
-  assert.deepEqual(captured, [[tab.id, { format: "png", scale: 0.5 }]]);
+  assert.deepEqual(captured, [[tab.id, { format: "png", scale: 2 }]]);
 });
 
 test("release takes the working marks off the tabs it hands back", async () => {

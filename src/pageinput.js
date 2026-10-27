@@ -10,10 +10,14 @@ export function pageInput(api, script) {
       guard?.();
       return script(tabId, "input", { ...p, kind: action, expected_origin: expected?.origin });
     },
-    // One image pixel per CSS pixel, as with the debugger: captureTab takes
-    // the page's devicePixelRatio back out.
+    // One image pixel per CSS pixel of the page, as with the debugger.
+    // captureTab renders the tab's own size in CSS pixels times its scale,
+    // which a zoomed page does not share, nor in Firefox for Android a page
+    // laid out wider than the screen (980 pixels without a viewport tag).
     async screenshot(tabId, view) {
-      const dataUrl = await api.tabs.captureTab(tabId, { format: "png", scale: 1 / (view?.scale || 1) });
+      const tab = await api.tabs.get(tabId).catch(() => null);
+      const scale = view?.width && tab?.width ? view.width / tab.width : 1;
+      const dataUrl = await api.tabs.captureTab(tabId, { format: "png", scale });
       return { dataUrl, width: view?.width, height: view?.height };
     },
     history: null,

@@ -49,7 +49,8 @@ export class Commands {
   // the browser has the debugger, pageInput where it has not), settings() ->
   // {address, key}, grant() -> the current grant, publish() announcing the
   // tabs, access(origin) -> whether the browser lets the extension reach an
-  // origin (access.js), fetch.
+  // origin (access.js), foreground (the browser lays out and captures only
+  // the tab in front: Firefox for Android), fetch.
   constructor(deps) {
     Object.assign(this, deps);
     this.fetch ||= globalThis.fetch.bind(globalThis);
@@ -215,6 +216,17 @@ export class Commands {
     if (cmd.action !== "close_tab") await this.mark(tab.id, true, session);
     const expected = { origin };
     const page = (action, params = {}) => this.script(tab.id, action, { ...params, expected_origin: origin });
+    // front brings the tab forward where only the tab in front has a size
+    // and a picture (Firefox for Android), and waits until the page has one:
+    // input at a point and a screenshot need it.
+    const front = async () => {
+      if (!this.foreground) return;
+      if (!(await this.api.tabs.get(tab.id)).active) await this.api.tabs.update(tab.id, { active: true });
+      for (let i = 0; i < 30; i++) {
+        if ((await page("viewport").catch(() => null))?.width > 0) return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    };
     let result;
 
     switch (cmd.action) {
@@ -245,6 +257,7 @@ export class Commands {
         result = await page("snapshot");
         break;
       case "screenshot": {
+        await front();
         const view = await page("viewport");
         await this.mark(tab.id, false, session);
         try {
@@ -260,6 +273,7 @@ export class Commands {
       case "press":
       case "scroll":
       case "drag": {
+        await front();
         if (p.ref) Object.assign(p, await page("target", { ref: p.ref, focus: cmd.action === "type" }));
         if (cmd.action === "scroll" && (p.x === undefined || p.y === undefined)) {
           const view = await page("viewport");

@@ -86,6 +86,7 @@ test("a command on Firefox for Android takes a shared tab into the chat's group 
     settings: () => ({ address: "http://127.0.0.1:12348", key: "k".repeat(32) }),
     grant: () => "g1",
     publish: async () => {},
+    foreground: true,
   });
   commands.input = pageInput(api, (tabId, action, params) => commands.script(tabId, action, params));
   android.scripting.results["pageAction:snapshot"] = { title: "Example", text: "Hello", elements: [] };
@@ -95,6 +96,17 @@ test("a command on Firefox for Android takes a shared tab into the chat's group 
   const result = await commands.handle({ action: "snapshot", tabId: tab.id, params: {}, grant: "g1", session });
   assert.equal(result.text, "Hello");
   assert.equal(groups.ownerOf(await api.tabs.get(tab.id)), "sess_a");
+  // A background tab has no size there: it comes forward before a click,
+  // and the page is asked for its size until it has one.
+  android.tabsById.get(tab.id).active = false;
+  let laidOut = false;
+  android.scripting.results["pageAction:viewport"] = () => (laidOut ? { width: 400, height: 800, scale: 2.6 } : ((laidOut = true), { width: 0, height: 0, scale: 2.6 }));
+  android.scripting.results["pageAction:hit"] = { crossOrigin: false };
+  android.scripting.results["pageAction:input"] = (p) => ({ ok: true, trusted: false, kind: p.kind });
+  const clicked = await commands.handle({ action: "click", tabId: tab.id, params: { x: 5, y: 6 }, grant: "g1", session });
+  assert.equal(clicked.kind, "click");
+  assert.ok(android.calls.some((c) => c[0] === "tabs.update" && c[1] === tab.id && c[2].active === true));
+  assert.ok(laidOut);
   await assert.rejects(
     commands.handle({ action: "snapshot", tabId: tab.id, params: {}, grant: "g1", session: { id: "sess_b" } }),
     (e) => e.reason === "other_chat",
