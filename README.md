@@ -57,7 +57,9 @@ flowchart TB
   tab Coddy opens starts in the chat's group. Drag a tab out of a group, or press **Take back**, to take it back.
 - **You approve websites.** Before the first action on a website, a small window of the extension asks: allow for
   this chat, always allow, or decline. "Always" covers the chats of the home server only: a chat from another
-  machine asks for every new website. A page cannot answer these questions for you.
+  machine asks for every new website. A page cannot answer these questions for you. Pages on your own machine
+  (`localhost`, `127.0.0.1`, `[::1]`, any port) go ahead without a question, except the Coddy server itself, whose
+  web UI approves the chats' own requests; the settings page switches that off.
 - **You can stop it.** The Stop button on the page Coddy works in cancels every action, ungroups every tab and takes
   back what the chats from other machines were allowed; the tabs stay open. **Disconnect** on the settings page does
   the same and closes the connection.
@@ -215,6 +217,9 @@ Press the toolbar button and write in the side panel, on the page you want Coddy
 The panel is the web UI: the answer streams, the tool calls show as they run, Coddy's questions come up in the chat,
 and the chat is an ordinary session you can continue anywhere. The strip over it shows the tab you look at and whose
 it is, with **Share** and **Take back**, and the settings button, in the web UI's theme.
+
+Open the panel on a tab a chat of your server works in, and the panel shows that chat: a turn started from the
+console, an editor or a scheduled job streams there as in any chat. The chat's name in the strip opens it again.
 
 From any other chat of Coddy, share a tab or let Coddy open one, and ask:
 
