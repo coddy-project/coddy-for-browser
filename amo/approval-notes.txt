@@ -1,27 +1,23 @@
-Coddy for Browser connects the browser to the user's own Coddy agent server (open source: https://github.com/coddy-project/coddy-agent), which the user runs on their machine or server. The add-on sends nothing to its developers or to any other party; it talks only to the server address the user enters on its settings page.
+Coddy for Browser connects the browser to the user's own Coddy agent server (open source: https://github.com/coddy-project/coddy-agent). It talks only to the server address the user enters on its settings page and sends nothing to its developers or anyone else.
 
-Source code: the package is the source as it is, with no bundler, minifier or transpiler. scripts/build.mjs in https://github.com/coddy-project/coddy-for-browser copies src/ and writes the Firefox manifest; the tag of this version holds the same files.
+Source: the package is the source as it is, with no bundler, minifier or transpiler; scripts/build.mjs in https://github.com/coddy-project/coddy-for-browser copies src/ and writes the manifest. The tag of this version holds the same files.
 
 How to test, with no account and no model:
 
-1. The repository's end-to-end run drives this build in a real Firefox against a mock of the Coddy server: git clone https://github.com/coddy-project/coddy-for-browser, git checkout <this version>, npm ci --ignore-scripts, npm run build, npm run e2e:firefox (Node.js 22 or later; Firefox on PATH, or its path in CODDY_FIREFOX_PATH).
+1. git clone https://github.com/coddy-project/coddy-for-browser, git checkout <this version>, npm ci --ignore-scripts, npm run build, npm run e2e:firefox. This drives the build in a real Firefox against a mock of the Coddy server (Node.js 22+; Firefox on PATH or in CODDY_FIREFOX_PATH).
 
-2. With a real server: install Coddy (https://coddy.dev/docs/getting-started/install) and put into ~/.coddy/config.yaml
-     httpserver:
-       auth_token: "<an API token>"
-     browser:
-       enable: true
-       token: "<32 or more characters>"
-       serve_remote: true
-   Run "coddy serve", open the add-on's settings page (it opens after the install), enter http://127.0.0.1:12345, the browser token and a name, and press Save and connect. The browser can then be driven without a model:
+2. With a real server: install Coddy (https://coddy.dev/docs/getting-started/install) and set in ~/.coddy/config.yaml
+     httpserver: { auth_token: "<API token>" }
+     browser: { enable: true, token: "<32+ characters>", serve_remote: true }
+   Run "coddy serve", and on the add-on's settings page (it opens after the install) enter http://127.0.0.1:12345, the browser token and a name, then Save and connect. Drive the browser without a model:
      curl -H "Authorization: Bearer <API token>" http://127.0.0.1:12345/coddy/browser/v1/browsers
-     curl -H "Authorization: Bearer <API token>" -H "Content-Type: application/json" -d '{"browser_id":"<id from the list>","action":"open_tab","params":{"url":"https://example.com"},"caller":{"node":"review","session_id":"s1","title":"Review"}}' http://127.0.0.1:12345/coddy/browser/v1/call
-   The add-on asks first whether that chat may use the browser, then whether it may act on the website. "snapshot", "click" (with "ref" from a snapshot), "type", "screenshot" and the other actions take the "tab_id" open_tab answers.
+     curl -H "Authorization: Bearer <API token>" -H "Content-Type: application/json" -d '{"browser_id":"<id>","action":"open_tab","params":{"url":"https://example.com"},"caller":{"node":"review","session_id":"s1","title":"Review"}}' http://127.0.0.1:12345/coddy/browser/v1/call
+   The add-on asks whether the chat may use the browser, then whether it may act on the website. snapshot, click, type and screenshot take the tab_id open_tab answers.
 
-Permissions: <all_urls> lets tabs.captureTab take screenshots and scripting.executeScript read and act on the websites the user approves in the add-on's own question; the add-on acts only on http and https pages in its tab groups. tabs and tabGroups: the tabs the user shares through tab groups. notifications: a question that waits for the user. storage: the settings and the allowed websites. alarms: reconnecting to the server.
+Permissions: <all_urls> for tabs.captureTab and scripting.executeScript on websites the user approves in the add-on's own question (http and https pages in its tab groups only); tabs and tabGroups for the tabs the user shares; notifications for a waiting question; storage for settings and allowed websites; alarms for reconnecting.
 
-Data collection (websiteContent, browsingActivity): the text, screenshots and addresses of pages on approved websites go to the Coddy server the user configured, and only there; that server passes them to the model provider the user configured on it.
+Data collection (websiteContent, browsingActivity): text, screenshots and addresses of pages on approved websites go only to the Coddy server the user configured, which passes them to the model provider set up there.
 
-The sidebar shows the web UI of the user's own Coddy server in an iframe and exchanges postMessage with it, checking the frame's window and origin. No remote code runs in the add-on's own pages (Content-Security-Policy script-src 'self').
+The sidebar shows the web UI of the user's server in an iframe and exchanges postMessage with it, checking the frame's window and origin. No remote code runs in the add-on's pages (CSP script-src 'self').
 
-Firefox for Android 142 and later is supported from this version, from the same package: it has no tab groups, windows or sidebar for add-ons, so the add-on keeps its groups itself and opens the web UI and its questions in tabs.
+Firefox for Android 142+ is supported from this version, same package: with no tab groups, windows or sidebar there, the add-on keeps its groups itself and opens the web UI and its questions in tabs.

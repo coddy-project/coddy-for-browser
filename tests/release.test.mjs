@@ -215,10 +215,15 @@ test("AMO is asked whether the listing exists before a version is sent", async (
   await assert.rejects(amoHasAddon({ ...args, guid: "guid-c" }), /HTTP 500/);
 });
 
-test("the version of package.json has its section in CHANGELOG.md, and the reviewers their notes", async () => {
+test("the version of package.json has its section in CHANGELOG.md, and the reviewers their notes, within AMO's limits", async () => {
   const { version } = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf8"));
   const changelog = await fs.readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8");
-  assert.notEqual(changelogSection(changelog, version), "", `CHANGELOG.md has no "## ${version}"`);
-  const approval = await fs.readFile(new URL("../amo/approval-notes.txt", import.meta.url), "utf8");
+  const section = changelogSection(changelog, version);
+  assert.notEqual(section, "", `CHANGELOG.md has no "## ${version}"`);
+  const approval = (await fs.readFile(new URL("../amo/approval-notes.txt", import.meta.url), "utf8")).trim();
   assert.match(approval, /How to test/);
+  // addons.mozilla.org refuses a version whose notes for reviewers are longer
+  // than 3000 characters (and holds release notes to the same bound).
+  assert.ok(approval.length <= 3000, `amo/approval-notes.txt has ${approval.length} characters, AMO takes 3000`);
+  assert.ok(plainText(section).length <= 3000, `the release notes of ${version} have ${plainText(section).length} characters`);
 });
