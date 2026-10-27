@@ -61,7 +61,9 @@ flowchart TB
   Coddy server itself, whose web UI approves the chats' own requests; revoke them there like any other site. The
   settings page also takes addresses beforehand - an origin (`https://example.com`), a port (`localhost:3000`), a
   range of ports (`10.0.0.5:8000-8100`) or every port (`example.com:*`) - and a switch that allows every website
-  for the chats of your server; your Coddy server still needs an entry with its own port.
+  for the chats of your server; your Coddy server still needs an entry with its own port. Chrome and Yandex Browser
+  follow your yes with a prompt of their own, once per website: the extension holds only this machine's addresses
+  from the install, and every other website from that prompt.
 - **You can stop it.** The Stop button on the page Coddy works in cancels every action, ungroups every tab and takes
   back what the chats from other machines were allowed; the tabs stay open. **Disconnect** on the settings page does
   the same and closes the connection.
@@ -130,7 +132,7 @@ from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.
   - Chrome 116 or newer;
   - Yandex Browser, or another browser built on Chromium, from the same package as Chrome. Yandex Browser has no
     side panel, so the web UI opens in a window of its own beside the browser's;
-  - Firefox 139 or newer, from the Firefox package. Firefox has no debugger API for extensions, so Coddy clicks and
+  - Firefox 140 or newer, from the Firefox package. Firefox has no debugger API for extensions, so Coddy clicks and
     types through the page: a page can tell such input from a person's, and a site that checks for it (some editors,
     some sign-in forms) does not react.
 - `coddy serve` built with the `browser` and `ui` tags, with its HTTP server on. The release binaries, the Docker image
@@ -240,6 +242,10 @@ open:
   <img src="docs/screenshots/site-approval-dark-420.png" width="420" alt="The extension asks whether Coddy may act on a website">
 </p>
 
+In Chrome and Yandex Browser, the first yes to a website brings up the browser's own prompt for that website too, and
+so do a website added on the settings page, the switch for every website and the address of a Coddy server on another
+machine. Firefox lets the extension into every website from the install, and the extension's own question decides.
+
 A chat of another Coddy process asks first, naming the machine it runs on:
 
 <p align="center">
@@ -257,7 +263,8 @@ A chat of another Coddy process asks first, naming the machine it runs on:
 | `alarms` | Wake the service worker to reconnect after Chrome stopped it; Firefox keeps its background page running. |
 | `notifications` | Tell you that Coddy asks to use a website. |
 | `sidePanel` | Chrome: the web UI beside the page. Firefox takes a sidebar from the manifest instead, and Yandex Browser opens a window. |
-| `http://*/*`, `https://*/*` | Act on the websites you allow, and reach your Coddy server. Firefox asks for `<all_urls>` instead, which its screenshot of a tab (`tabs.captureTab`) needs; the extension still acts on web pages only. |
+| `localhost`, `127.0.0.1`, `[::1]` | Reach a Coddy server on this machine and act on the pages of this machine, which are on the list of sites allowed always from the start. |
+| `http://*/*`, `https://*/*`, optional | Chrome and Yandex Browser: act on a website once you allow it, and reach a Coddy server on another machine once you save its address. The browser grants each one in a prompt of its own, once; nothing beyond this machine is granted at install. Firefox holds `<all_urls>` from the install instead, which its screenshot of a tab (`tabs.captureTab`) needs; the extension still acts on web pages only, after its own question. |
 
 The extension sends nothing anywhere but your Coddy server. Pages Coddy reads still reach the model provider your
 Coddy server is configured with. The [privacy policy](PRIVACY.md) lists what goes to the server and what stays in the
@@ -352,6 +359,7 @@ one-time setup; until it is done, its job prints what is missing and the release
 | `src/commands.js` | Every action Coddy asks for, with the checks before it. |
 | `src/groups.js` | The Coddy tab groups and who holds which tab. |
 | `src/approvals.js`, `src/policy.js` | Website approvals and address checks. |
+| `src/access.js` | The browser's own grant of websites: asked for in the click that allows one, checked before an action. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | What runs in a page, input through the DevTools protocol (Chrome) or through the page (Firefox), the working indicator. |
 | `scripts/build.mjs` | The build of each browser family (the Firefox manifest is Manifest V2). |
 | `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | The version of the next release, the upload to the Chrome Web Store and the submission to addons.mozilla.org. |

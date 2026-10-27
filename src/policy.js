@@ -136,6 +136,21 @@ export function siteEntry(input) {
   return `${scheme}://${host}:${port || "*"}`;
 }
 
+// accessPatterns are the match patterns the browser is asked for to let the
+// extension into an origin or an entry of the list: an origin with its port,
+// a host on one port under both schemes (Chrome takes no port after "*://"),
+// and a host on a range of ports on every port, which a pattern cannot narrow.
+export function accessPatterns(entry) {
+  const m = PATTERN.exec(entry);
+  if (!m) {
+    const { scheme, host, port } = parts(entry);
+    return [`${scheme}://${host}:${port}/*`];
+  }
+  const [, scheme, host, ports] = m;
+  if (!/^\d+$/.test(ports)) return [`${scheme}://${host}/*`];
+  return (scheme === "*" ? ["http", "https"] : [scheme]).map((s) => `${s}://${host}:${ports}/*`);
+}
+
 // Grants say which websites Coddy may act on without asking: always, or for
 // the rest of one chat (until the browser restarts).
 // granted reports whether origin may be acted on for the chat. An "always"

@@ -1,4 +1,7 @@
+import { api } from "./platform.js";
 import { request, el, showError, statusClass } from "./ui.js";
+import { EVERY_SITE, requestAccess } from "./access.js";
+import { accessPatterns, serverURL, siteEntry } from "./policy.js";
 
 // trashIcon is the glyph of a row's Revoke button, built with DOM calls
 // rather than markup, which the add-on stores' review flags.
@@ -71,6 +74,11 @@ async function refresh() {
 $("connect").onsubmit = async (event) => {
   event.preventDefault();
   try {
+    // Files go to and from the server by the extension's own requests: the
+    // browser is asked once for a server on another machine, this machine's
+    // addresses it granted at install.
+    if (!(await requestAccess(api, accessPatterns(serverURL($("address").value)))))
+      throw new Error("The browser did not let the extension reach the server");
     await request({ type: "save", address: $("address").value, key: $("key").value, name: $("name").value });
     $("key").value = "";
     $("key").placeholder = "Keep the current key";
@@ -80,15 +88,25 @@ $("connect").onsubmit = async (event) => {
     showError(e);
   }
 };
-$("all").onclick = () =>
-  request({ type: "setAllowAll", on: $("all").getAttribute("aria-checked") !== "true" })
+$("all").onclick = () => {
+  const on = $("all").getAttribute("aria-checked") !== "true";
+  // Every website takes the browser's word for every website, in this click.
+  (on ? requestAccess(api, EVERY_SITE) : Promise.resolve(true))
+    .then((granted) => {
+      if (!granted) throw new Error("The browser did not let the extension into every website");
+      return request({ type: "setAllowAll", on });
+    })
     .then(refresh)
     .catch(showError);
+};
 $("add-site").onsubmit = async (event) => {
   event.preventDefault();
   const said = $("site-error");
   try {
-    await request({ type: "allowSite", site: $("site").value });
+    const entry = siteEntry($("site").value);
+    if (!(await requestAccess(api, accessPatterns(entry))))
+      throw new Error(`The browser did not let the extension into ${siteLabel(entry)}`);
+    await request({ type: "allowSite", site: entry });
     $("site").value = "";
     said.hidden = true;
     await refresh();

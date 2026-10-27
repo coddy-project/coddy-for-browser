@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { siteOf, serverURL, socketURL, fileURL, granted, grant, revoke, isLocalOrigin, covers, LOCAL_SITES, siteEntry, checkKey, checkName } from "../src/policy.js";
+import { siteOf, serverURL, socketURL, fileURL, granted, grant, revoke, isLocalOrigin, covers, LOCAL_SITES, siteEntry, accessPatterns, checkKey, checkName } from "../src/policy.js";
 
 test("a website is its origin, scheme and port included", () => {
   assert.equal(siteOf("https://example.com/a?b#c"), "https://example.com");
@@ -107,6 +107,20 @@ test("every website, for the chats of the server only and never its own web UI",
   assert.ok(!granted("http://localhost:12345", "s1", all, { home }));
   assert.ok(!granted("https://any.example", "laptop/s1", all, { remote: true, home }));
   assert.ok(granted(home, "s1", { ...all, always: ["*://127.0.0.1:12345"] }, { home }));
+});
+
+test("the browser is asked for an origin with its port, and for a host on every port when the entry names several", () => {
+  const cases = {
+    "https://example.com": ["https://example.com:443/*"],
+    "http://10.0.0.5:8080": ["http://10.0.0.5:8080/*"],
+    "http://[::1]:8080": ["http://[::1]:8080/*"],
+    "*://localhost:3000": ["http://localhost:3000/*", "https://localhost:3000/*"],
+    "*://example.com:1000-2000": ["*://example.com/*"],
+    "https://example.com:1000-2000": ["https://example.com/*"],
+    "*://example.com:*": ["*://example.com/*"],
+    "http://example.com:*": ["http://example.com/*"],
+  };
+  for (const [entry, patterns] of Object.entries(cases)) assert.deepEqual(accessPatterns(entry), patterns, entry);
 });
 
 test("the key and the name are checked before they are kept", () => {

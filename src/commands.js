@@ -3,7 +3,7 @@
 // still current, the tab is the chat's to use, and the user allowed the
 // website.
 
-import { siteOf, fileURL } from "./policy.js";
+import { siteOf, fileURL, serverURL } from "./policy.js";
 import { failure } from "./rpc.js";
 import { pageAction } from "./page.js";
 import { indicator } from "./indicator.js";
@@ -48,10 +48,20 @@ export class Commands {
   // deps: api (chrome or browser), groups, approvals, input (cdpInput where
   // the browser has the debugger, pageInput where it has not), settings() ->
   // {address, key}, grant() -> the current grant, publish() announcing the
-  // tabs, fetch.
+  // tabs, access(origin) -> whether the browser lets the extension reach an
+  // origin (access.js), fetch.
   constructor(deps) {
     Object.assign(this, deps);
     this.fetch ||= globalThis.fetch.bind(globalThis);
+    this.access ||= async () => true;
+  }
+
+  // reachServer refuses a file transfer the browser would block: the
+  // extension reaches a Coddy server on another machine only while the
+  // browser grants it, which the settings page asks for.
+  async reachServer() {
+    if (!(await this.access(serverURL(this.settings().address))))
+      throw failure("transfer_failed", "The browser does not let the extension reach the Coddy server; save the server address again in the extension's settings");
   }
 
   async script(tabId, action, params) {
@@ -275,6 +285,7 @@ export class Commands {
         break;
       }
       case "upload_file": {
+        await this.reachServer();
         const response = await this.fetch(fileURL(this.settings().address, p.transfer_id), {
           headers: { Authorization: `Bearer ${this.settings().key}` },
           redirect: "error",
@@ -288,6 +299,7 @@ export class Commands {
         break;
       }
       case "download_file": {
+        await this.reachServer();
         const address = new URL(p.url, tab.url);
         const target = siteOf(address.href);
         if (target !== origin) {

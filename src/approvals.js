@@ -15,10 +15,14 @@ export class Approvals {
   // (it falls back to store when there is none). onChange is called whenever
   // the queue changes, so the badge and the approval window follow it.
   // home() is the origin of the connected Coddy server, which local addresses
-  // never cover.
-  constructor({ store, sessionStore = store, onChange = () => {}, timeoutMs = TIMEOUT_MS, home = () => "" }) {
+  // never cover. access(origin) says whether the browser lets the extension
+  // into origin (access.js): a site allowed here that the browser does not
+  // open to the extension, or no longer does, is asked about again, and the
+  // answer asks the browser too.
+  constructor({ store, sessionStore = store, onChange = () => {}, timeoutMs = TIMEOUT_MS, home = () => "", access = async () => true }) {
     this.store = store;
     this.home = home;
+    this.access = access;
     this.sessionStore = sessionStore;
     this.onChange = onChange;
     this.timeoutMs = timeoutMs;
@@ -79,22 +83,34 @@ export class Approvals {
     );
   }
 
+  // ready reports whether origin may be acted on for the chat and the
+  // browser lets the extension in.
+  async ready(origin, session) {
+    return this.allowed(origin, session) && (await this.access(origin));
+  }
+
   // ensure resolves when origin may be acted on for the chat, and rejects
   // when the user declines, the question times out or the command is
-  // cancelled.
+  // cancelled. A site the user did not allow is asked about at once; an
+  // allowed one only when the browser keeps the extension out of it.
   ensure(origin, session, action, signal) {
-    if (this.allowed(origin, session)) return Promise.resolve();
-    return this.ask(
-      { kind: "site", origin, action, session },
-      signal,
-      `The user did not answer whether Coddy may act on ${origin}`,
-      (fail, done) => async (choice) => {
-        if (choice === "deny") return fail("site_declined", `The user declined Coddy access to ${origin}`);
-        // An "always" from a chat of another Coddy is an answer for that chat.
-        await this.allow(origin, session.id, choice === "always" && !session.node ? "always" : "chat");
-        done();
-      },
-    );
+    const ask = () =>
+      this.ask(
+        { kind: "site", origin, action, session },
+        signal,
+        `The user did not answer whether Coddy may act on ${origin}`,
+        (fail, done) => async (choice) => {
+          if (choice === "deny") return fail("site_declined", `The user declined Coddy access to ${origin}`);
+          // The page that took the answer asked the browser first; a site the
+          // browser keeps closed is one the extension cannot act on.
+          if (!(await this.access(origin))) return fail("site_declined", `The browser did not let the extension into ${origin}`);
+          // An "always" from a chat of another Coddy is an answer for that chat.
+          await this.allow(origin, session.id, choice === "always" && !session.node ? "always" : "chat");
+          done();
+        },
+      );
+    if (!this.allowed(origin, session)) return ask();
+    return this.access(origin).then((open) => (open ? undefined : ask()));
   }
 
   // ask queues one question; decider(fail, done) makes what an answer does.
@@ -118,7 +134,10 @@ export class Approvals {
       const answered = decider(fail, () => {
         // Every other question the answer settles is answered too.
         for (const other of this.pending.values())
-          if (other.id !== id && this.settled(other)) other.decide("chat").catch(() => {});
+          if (other.id !== id)
+            this.settled(other)
+              .then((yes) => yes && this.pending.has(other.id) && other.decide("chat"))
+              .catch(() => {});
         done();
       });
       const { session } = question;
@@ -134,8 +153,8 @@ export class Approvals {
     });
   }
 
-  settled(q) {
-    return q.kind === "chat" ? this.chatAllowed(q.session) : this.allowed(q.origin, q.session);
+  async settled(q) {
+    return q.kind === "chat" ? this.chatAllowed(q.session) : this.ready(q.origin, q.session);
   }
 
   async allow(origin, sessionId, scope) {

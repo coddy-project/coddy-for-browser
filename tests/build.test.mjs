@@ -13,6 +13,17 @@ test("the Chrome build keeps the side panel, the debugger and the service worker
   assert.equal(chrome.side_panel.default_path, "panel.html");
 });
 
+test("the Chrome build holds this machine's addresses and asks for every other website at run time", () => {
+  const { chrome } = manifests(base, "1.2.3");
+  assert.deepEqual(chrome.host_permissions, ["*://localhost/*", "*://127.0.0.1/*", "*://[::1]/*"]);
+  assert.deepEqual(chrome.optional_host_permissions, ["http://*/*", "https://*/*"]);
+  // The store reviews a request for every website at length.
+  for (const broad of ["<all_urls>", "*://*/*", "http://*/*", "https://*/*"]) {
+    assert.ok(!chrome.host_permissions.includes(broad), broad);
+    assert.ok(!chrome.permissions.includes(broad), broad);
+  }
+});
+
 test("the Firefox build is Manifest V2 with a sidebar, a persistent page and its add-on id, and no Chrome-only keys", () => {
   const { firefox } = manifests(base, "1.2.3");
   assert.equal(firefox.manifest_version, 2);
@@ -24,6 +35,12 @@ test("the Firefox build is Manifest V2 with a sidebar, a persistent page and its
   assert.ok(firefox.permissions.includes("tabGroups"));
   assert.ok(firefox.permissions.includes("<all_urls>"));
   assert.equal(firefox.host_permissions, undefined);
+  assert.equal(firefox.optional_host_permissions, undefined);
+  // The data collection permissions need Firefox 140. No gecko_android:
+  // addons.mozilla.org takes it as a claim of Firefox for Android support,
+  // which has neither tab groups nor a sidebar.
+  assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, "140.0");
+  assert.equal(firefox.browser_specific_settings.gecko_android, undefined);
   assert.equal(firefox.sidebar_action.default_panel, "panel.html");
   assert.equal(firefox.browser_specific_settings.gecko.id, GECKO_ID);
   assert.equal(firefox.side_panel, undefined);

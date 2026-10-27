@@ -105,11 +105,13 @@ try {
   assert.equal(coddy.state.hello.browser.name, "Chrome - e2e");
 
   // Sites allowed beforehand: an address with a range of ports goes on the
-  // list, a scheme other than http(s) is refused under the field, and the
-  // switch for every website shows its note.
-  await options.locator("#site").fill("example.com:1000-2000");
+  // list, and a scheme other than http(s) is refused under the field. The
+  // address is this machine's, which Chrome granted at install: another
+  // website brings up Chrome's own prompt, which a headless browser never
+  // answers (the end of the run checks that nothing is allowed meanwhile).
+  await options.locator("#site").fill("localhost:1000-2000");
   await options.getByRole("button", { name: "Add" }).click();
-  await options.locator('#allowed span[title="*://example.com:1000-2000"]').getByText("example.com, ports 1000-2000").waitFor();
+  await options.locator('#allowed span[title="*://localhost:1000-2000"]').getByText("localhost, ports 1000-2000").waitFor();
   await options.locator("#site").fill("ftp://example.com");
   await options.getByRole("button", { name: "Add" }).click();
   await options.locator("#site-error").getByText("Only http and https addresses can be allowed").waitFor();
@@ -128,13 +130,6 @@ try {
     };
   });
   assert.deepEqual(gaps, { description: 10, field: 10, error: 6, list: 10, rows: [8] });
-  const every = options.getByRole("switch", { name: "Allow every website without asking" });
-  await every.click();
-  await options.locator('#all[aria-checked="true"]').waitFor();
-  await options.locator("#all-note").waitFor();
-  await every.click();
-  await options.locator('#all[aria-checked="false"]').waitFor();
-  await options.locator("#all-note").waitFor({ state: "hidden" });
   assert.ok(coddy.state.hello.actions.includes("open_tab"));
   assert.deepEqual(coddy.state.tabs, []);
   await capture(options, "options-connected", [1280, 390]);
@@ -282,8 +277,20 @@ try {
   await panel.getByRole("button", { name: "Decline" }).click();
   await assert.rejects(again, (e) => e.data?.reason === "chat_declined");
 
+  // Every website and another website wait for Chrome's own prompt, which a
+  // headless browser never answers: neither is allowed meanwhile. They come
+  // last, so the open prompt holds up nothing else.
+  await options.bringToFront();
+  await options.getByRole("switch", { name: "Allow every website without asking" }).click();
+  await options.locator("#site").fill("example.com:1000-2000");
+  await options.getByRole("button", { name: "Add" }).click();
+  await new Promise((r) => setTimeout(r, 1000));
+  assert.equal(await options.locator("#all").getAttribute("aria-checked"), "false");
+  assert.ok(await options.locator("#all-note").isHidden());
+  assert.equal(await options.locator('#allowed span[title="*://example.com:1000-2000"]').count(), 0);
+
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Disconnect");
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Disconnect, nothing allowed before Chrome's own prompt");
 } finally {
   await close();
   await coddy.close();

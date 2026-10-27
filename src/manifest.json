@@ -37,6 +37,11 @@
     "sidePanel"
   ],
   "host_permissions": [
+    "*://localhost/*",
+    "*://127.0.0.1/*",
+    "*://[::1]/*"
+  ],
+  "optional_host_permissions": [
     "http://*/*",
     "https://*/*"
   ],

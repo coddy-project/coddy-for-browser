@@ -20,7 +20,7 @@ ${published}
 | Package | Browsers |
 | --- | --- |
 | \`${chrome}\` | Chrome, Yandex Browser and other Chromium browsers |
-| \`${firefox}\` | Firefox 139 and later, unsigned |
+| \`${firefox}\` | Firefox 140 and later, unsigned |
 
 **Chrome, Yandex Browser, from the package.** Unpack \`${chrome}\` into a folder you keep, open \`chrome://extensions\` (\`browser://extensions\` in Yandex Browser), turn on Developer mode, press Load unpacked and choose the folder.
 

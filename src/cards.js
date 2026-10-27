@@ -1,5 +1,8 @@
 // Cards the side panel and the approval window share.
+import { api } from "./platform.js";
 import { request, el, showError } from "./ui.js";
+import { requestAccess } from "./access.js";
+import { accessPatterns } from "./policy.js";
 
 const choices = [
   ["chat", "Allow for this chat", "primary"],
@@ -31,8 +34,16 @@ export function approvalCard(p, after) {
   const offered = p.kind === "chat" || remote ? choices.filter(([choice]) => choice !== "always") : choices;
   for (const [choice, label, kind] of offered) {
     const b = el("button", { type: "button", class: kind }, label);
+    // Allowing a website asks the browser in the same click: Chrome lets the
+    // extension into a website only on the person's word, and asks once per
+    // website.
+    const access = () => (p.kind === "site" && choice !== "deny" ? requestAccess(api, accessPatterns(p.origin)) : Promise.resolve(true));
     b.onclick = () =>
-      request({ type: "decide", id: p.id, choice })
+      access()
+        .then((granted) => {
+          if (!granted) throw new Error(`The browser did not let the extension into ${p.origin}; allow it there, or decline`);
+          return request({ type: "decide", id: p.id, choice });
+        })
         .then(after)
         .catch(showError);
     row.append(b);

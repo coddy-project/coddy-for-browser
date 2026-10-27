@@ -20,8 +20,16 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const extension = path.join(root, "dist", "chrome");
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "coddy-for-browser-drive-"));
+// Chrome follows the first "Always allow" on a website with a prompt of its
+// own, which a headless browser never answers. The driver runs a copy of the
+// build that holds every website from the install, as the person's yes there
+// would give it.
+const extension = path.join(profile, "extension");
+await fs.cp(path.join(root, "dist", "chrome"), extension, { recursive: true });
+const manifest = JSON.parse(await fs.readFile(path.join(extension, "manifest.json"), "utf8"));
+manifest.host_permissions = [...manifest.host_permissions, ...(manifest.optional_host_permissions || [])];
+await fs.writeFile(path.join(extension, "manifest.json"), JSON.stringify(manifest, null, 2));
 const context = await chromium.launchPersistentContext(profile, {
   headless: true,
   locale: "en-US",

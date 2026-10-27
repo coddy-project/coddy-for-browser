@@ -1,16 +1,16 @@
 // The Firefox build in a real Firefox against the mock of Coddy's HTTP
-// server: connect, the site approval window, open_tab, read the page, act on
-// it through the page (Firefox has no debugger API), a screenshot through
-// tabs.captureTab, files both ways, the side panel's web UI signed in by its
-// ticket with a turn from the person's tab, a chat of another Coddy asking
-// first, Disconnect.
+// server: connect, sites allowed beforehand and every website, the site
+// approval window, open_tab, read the page, act on it through the page
+// (Firefox has no debugger API), a screenshot through tabs.captureTab, files
+// both ways, the side panel's web UI signed in by its ticket with a turn from
+// the person's tab, a chat of another Coddy asking first, Disconnect.
 //
 //   npm run build
 //   npm i --no-save puppeteer-core   # once; or NODE_PATH pointing at one
 //   npm run e2e:firefox
 //
 // CODDY_FIREFOX_PATH names the Firefox to run (default: firefox on PATH);
-// Firefox 139 or later. Puppeteer installs the extension over WebDriver BiDi,
+// Firefox 140 or later. Puppeteer installs the extension over WebDriver BiDi,
 // the way about:debugging loads a temporary add-on.
 
 import assert from "node:assert/strict";
@@ -111,6 +111,19 @@ try {
   assert.equal(coddy.state.hello.browser.name, "Firefox - e2e");
   assert.ok(coddy.state.hello.actions.includes("click"));
 
+  // The Firefox build holds every website from the install, so the list and
+  // the switch for every website take another website without a prompt of
+  // the browser's own (the Chromium run cannot answer Chrome's).
+  await options.locator("#site").fill("example.com:1000-2000");
+  await options.locator('button[aria-label="Add"]').click();
+  await options.waitForSelector('#allowed span[title="*://example.com:1000-2000"]');
+  await options.locator("#all").click();
+  await options.waitForSelector('#all[aria-checked="true"]');
+  await options.waitForSelector("#all-note:not([hidden])");
+  await options.locator("#all").click();
+  await options.waitForSelector('#all[aria-checked="false"]');
+  await options.waitForSelector("#all-note[hidden]");
+
   // open_tab asks about the site in a window of the extension's own.
   const opening = coddy.command("open_tab", { params: { url: coddy.base + "/fixture" } });
   const approval = await extensionPage("approval.html");
@@ -193,7 +206,7 @@ try {
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS (Firefox): connect, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
+  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
 } catch (e) {
   console.error(e);
   process.exitCode = 1;
