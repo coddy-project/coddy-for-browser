@@ -284,13 +284,49 @@ button.link {
 button.link:hover {
   text-decoration: underline;
 }
+/* The chat that holds the tab: a link to it that reads as the strip's note. */
+.tabbar button.link.chat {
+  color: var(--muted);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 body.panel > .error,
-body.panel > .card,
-#approvals {
+.stage > .card {
   margin: 8px 10px 0;
+}
+/* The web UI fills the stage; a question floats over it, so the chat's own
+   background shows around the card instead of a band of the panel's. */
+.stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+#approvals {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
 }
 #approvals:empty {
   display: none;
+}
+#approvals .card {
+  margin: 0;
+  /* The glass tint of the web UI over its solid ground: the chat under the
+     card does not show through the text. */
+  background: linear-gradient(var(--surface), var(--surface)), var(--bg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+#approvals .card > :last-child {
+  margin-bottom: 0;
 }
 #webui {
   flex: 1;

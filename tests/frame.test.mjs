@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { frameURL, listen, themeOf, PANEL_SOURCE, WEBUI_SOURCE, textOn } from "../src/frame.js";
+import { frameURL, homeSession, listen, openChat, themeOf, PANEL_SOURCE, WEBUI_SOURCE, textOn } from "../src/frame.js";
 
 const theme = {
   scheme: "dark",
@@ -67,4 +67,22 @@ test("the text on an accent button is the one that reads better on it", () => {
   // Anything that is not a computed colour is refused.
   assert.equal(textOn("url(x)"), null);
   assert.equal(textOn(""), null);
+});
+
+test("the panel opens the web UI on a chat of its server, and asks it to show one later", () => {
+  const url = new URL(frameURL("http://127.0.0.1:12345/", "t".repeat(64), "chrome-extension://abc", "sess_0a1b"));
+  assert.equal(url.hash, "#/s/sess_0a1b");
+  // A chat of another Coddy process, or nothing, opens the web UI as it is.
+  assert.equal(new URL(frameURL("http://127.0.0.1:12345/", "t", "chrome-extension://abc", "laptop/sess_1")).hash, "");
+  assert.equal(new URL(frameURL("http://127.0.0.1:12345/", "t", "chrome-extension://abc")).hash, "");
+  assert.equal(homeSession("sess_x"), "sess_x");
+  assert.equal(homeSession("../sess_x"), "");
+
+  const posted = [];
+  const frame = { postMessage: (message, to) => posted.push({ message, to }) };
+  assert.ok(openChat(frame, "http://127.0.0.1:12345", "sess_0a1b"));
+  assert.deepEqual(posted, [{ message: { source: PANEL_SOURCE, type: "open", sessionId: "sess_0a1b" }, to: "http://127.0.0.1:12345" }]);
+  assert.ok(!openChat(frame, "http://127.0.0.1:12345", "laptop/sess_1"));
+  assert.ok(!openChat(frame, "", "sess_0a1b"));
+  assert.equal(posted.length, 1);
 });

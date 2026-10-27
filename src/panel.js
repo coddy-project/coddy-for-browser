@@ -1,6 +1,8 @@
 // The side panel: the web UI of the Coddy server the extension is connected
 // to, in a frame, under a strip of the extension's own - the tab you look at
-// with Share and Take back, and the settings. The connection and Disconnect
+// with Share and Take back, and the settings. Opened on a tab a chat of the
+// server holds, the web UI shows that chat, its turn live; the chat's name in
+// the strip opens it again later. The connection and Disconnect
 // are on the settings page, Stop on the page Coddy works in. A turn sent from the web UI
 // takes the tab you look at into its chat's tab group first. The same page is
 // Chrome's side panel, Firefox's sidebar and, in Yandex Browser, a window of
@@ -8,7 +10,7 @@
 import { api } from "./platform.js";
 import { request, el, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
-import { frameURL, listen, textOn } from "./frame.js";
+import { frameURL, homeSession, listen, openChat, textOn } from "./frame.js";
 
 const $ = (id) => document.getElementById(id);
 // The worker counts open panels: a website question shows here instead of a
@@ -29,9 +31,12 @@ function tabbar(s) {
     return;
   }
   let note;
-  if (c.owner === "") note = "shared";
-  else if (c.owner) note = `in "${c.chat}"`;
-  else note = "taken when you send";
+  if (c.owner === "") note = el("small", { class: "muted" }, "shared");
+  else if (homeSession(c.owner)) {
+    note = el("button", { type: "button", class: "link chat", title: "Show this chat" }, `in "${c.chat}"`);
+    note.onclick = () => openChat($("webui").contentWindow, origin, c.owner);
+  } else if (c.owner) note = el("small", { class: "muted" }, `in "${c.chat}"`);
+  else note = el("small", { class: "muted" }, "taken when you send");
   const shared = c.owner !== null;
   const toggle = el("button", { type: "button", class: "link" }, shared ? "Take back" : "Share");
   toggle.title = shared ? "Take this tab out of Coddy's tab groups" : "Put this tab in the Coddy tab group, where any chat may use it";
@@ -41,18 +46,20 @@ function tabbar(s) {
       .catch(showError);
   bar.append(
     el("span", { class: "tab-title", title: c.url }, c.title || new URL(c.url).host),
-    el("small", { class: "muted" }, note),
+    note,
     toggle,
   );
 }
 
 // load puts the web UI in the frame, signed in with a fresh ticket.
-async function load() {
+// load opens the web UI on sessionId, the chat that holds the person's tab,
+// when there is one of this server.
+async function load(sessionId = "") {
   try {
     const opened = await request({ type: "panelOpen" });
     origin = new URL(opened.webUI).origin;
     const frame = $("webui");
-    frame.src = frameURL(opened.webUI, opened.ticket, location.origin);
+    frame.src = frameURL(opened.webUI, opened.ticket, location.origin, sessionId);
     frame.hidden = false;
     loaded = opened.webUI;
     showError(null);
@@ -83,7 +90,7 @@ async function refresh() {
   const offline = state.status !== "Connected";
   $("offline").hidden = !offline;
   $("offline-text").textContent = state.settings.enabled ? `Coddy: ${state.status}` : "Connect the extension to your Coddy server.";
-  if (!offline && !loaded) await load();
+  if (!offline && !loaded) await load(state.current?.owner);
   tabbar(state);
   const next = JSON.stringify(state.pending);
   if (next !== rendered) {

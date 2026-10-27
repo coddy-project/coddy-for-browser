@@ -20,12 +20,14 @@
       </button>
     </header>
     <p id="error" class="error" role="alert" hidden></p>
-    <section id="approvals" aria-live="assertive"></section>
-    <section id="offline" class="card offline" hidden>
-      <p id="offline-text">Not connected to Coddy.</p>
-      <button id="open-settings" class="primary" type="button">Settings</button>
-    </section>
-    <iframe id="webui" title="Coddy" hidden></iframe>
+    <div class="stage">
+      <iframe id="webui" title="Coddy" hidden></iframe>
+      <section id="approvals" aria-live="assertive"></section>
+      <section id="offline" class="card offline" hidden>
+        <p id="offline-text">Not connected to Coddy.</p>
+        <button id="open-settings" class="primary" type="button">Settings</button>
+      </section>
+    </div>
     <script type="module" src="panel.js"></script>
   </body>
 </html>
