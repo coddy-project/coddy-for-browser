@@ -81,9 +81,11 @@ const browser = await puppeteer.launch({
   executablePath: firefoxPath(),
   headless: true,
   // Firefox 150 and later let WebDriver BiDi open privileged pages - the
-  // extension's own moz-extension: pages - only with this switch; older
-  // versions ignore it.
+  // extension's own moz-extension: pages - only with this switch, and later
+  // releases only with the environment variable as well; older versions
+  // ignore both.
   args: ["-remote-allow-system-access"],
+  env: { ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1" },
   extraPrefsFirefox: {
     "extensions.webextensions.uuids": JSON.stringify({ [GECKO_ID]: uuid }),
     "intl.locale.requested": "en-US",
