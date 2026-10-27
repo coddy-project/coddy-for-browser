@@ -315,16 +315,18 @@ Merging a pull request into `main` releases it. [tag-on-merge.yaml](.github/work
 commit with the next version: the patch after the newest `X.Y.Z` tag, or the version of `package.json` when that is
 higher, so a pull request raises the minor or major version by editing `package.json`. Then
 [release.yaml](.github/workflows/release.yaml) builds that version into both manifests, attaches the packages to a
-GitHub release and submits them to the Chrome Web Store and addons.mozilla.org, which publish the version once their
-review passes. A direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of
+GitHub release and submits them to the Chrome Web Store and addons.mozilla.org where publishing there is switched on;
+the stores publish the version once their review passes. A direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of
 `main`, or, with a tag given, releases that tag again.
 
 One job builds the packages, and the GitHub release and each store are jobs of their own that take those packages. A
 job that failed is run again alone (**Re-run failed jobs**, or that job's own re-run), and a store job skips a version
 the store already holds, so a release half done is finished without touching what went through.
 
-Each store needs a one-time setup. Until it is done, its job prints what is missing and the release goes out without
-that store.
+Publishing to a store is switched on by the repository variable `CWS_PUBLISH` or `AMO_PUBLISH` set to `true`
+(Settings, Secrets and variables, Actions, or `gh variable set AMO_PUBLISH --body true`). While it is not, the job of
+that store is skipped, the release goes out without it, and the release notes do not name it. Each store also needs a
+one-time setup; until it is done, its job prints what is missing and the release goes out without that store.
 
 - **Chrome Web Store** (`scripts/publish-chrome.mjs`, API v2). Register as a developer, create the item by uploading the
   first package by hand in the developer dashboard, and fill in its store listing and privacy tabs. Then enable the

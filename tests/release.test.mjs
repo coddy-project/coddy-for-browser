@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { nextVersion } from "../scripts/next-version.mjs";
 import { publishChrome, CHROME_KEYS } from "../scripts/publish-chrome.mjs";
 import { amoToken, amoHasVersion } from "../scripts/sign.mjs";
+import { releaseNotes } from "../scripts/release-notes.mjs";
 import crypto from "node:crypto";
 
 test("the first release takes the version of package.json", () => {
@@ -144,4 +145,19 @@ test("a re-run asks AMO whether the version is already there", async () => {
   await assert.rejects(amoHasVersion({ ...args, version: "0.1.4" }), /HTTP 500/);
   assert.equal(seen[0].url, "https://addons.mozilla.org/api/v5/addons/addon/coddy-for-browser%40coddy.dev/versions/0.1.2/");
   assert.match(seen[0].auth, /^JWT [\w-]+\.[\w-]+\.[\w-]+$/);
+});
+
+test("the release notes name only the stores the release is sent to", () => {
+  const none = releaseNotes("0.1.2", { CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
+  assert.doesNotMatch(none, /Chrome Web Store|addons\.mozilla\.org|review/);
+  assert.match(none, /coddy-for-browser-chrome-0\.1\.2\.zip/);
+  assert.match(none, /coddy-for-browser-firefox-0\.1\.2\.zip/);
+
+  const amo = releaseNotes("0.1.2", { AMO_PUBLISH: "true", CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
+  assert.match(amo, /\[addons\.mozilla\.org\]\(https:\/\/addons\.mozilla\.org\/firefox\/addon\/coddy-for-browser\/\)/);
+  assert.doesNotMatch(amo, /Chrome Web Store/);
+
+  const both = releaseNotes("0.1.2", { AMO_PUBLISH: "true", CWS_PUBLISH: "true", CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
+  assert.match(both, /chromewebstore\.google\.com\/detail\/abcdefghijklmnopabcdefghijklmnop/);
+  assert.match(both, /once their review passes/);
 });

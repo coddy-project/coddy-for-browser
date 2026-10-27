@@ -9,8 +9,10 @@
 # store already holds. tag-on-merge.yaml calls this workflow after tagging a
 # merged pull request; a tag pushed by hand runs it too.
 #
-# A store whose credentials are not set is skipped with a notice (README,
-# Releases):
+# A store job runs only when its repository variable is true, CWS_PUBLISH
+# for the Chrome Web Store and AMO_PUBLISH for addons.mozilla.org; otherwise
+# it is skipped and the release goes out without that store. A store job whose
+# credentials are not set says what is missing and passes (README, Releases):
 #   - Chrome Web Store: secrets CWS_CLIENT_ID, CWS_CLIENT_SECRET,
 #     CWS_REFRESH_TOKEN and variables CWS_PUBLISHER_ID, CWS_EXTENSION_ID;
 #   - addons.mozilla.org: secrets AMO_JWT_ISSUER, AMO_JWT_SECRET.
@@ -91,6 +93,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          # The notes name only the stores this release is sent to.
+          CWS_PUBLISH: ${{ vars.CWS_PUBLISH }}
+          AMO_PUBLISH: ${{ vars.AMO_PUBLISH }}
         run: |
           node scripts/release-notes.mjs "$TAG" > notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -103,6 +108,7 @@ jobs:
   chrome-web-store:
     name: Chrome Web Store
     needs: build
+    if: vars.CWS_PUBLISH == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -129,6 +135,7 @@ jobs:
   firefox-add-ons:
     name: addons.mozilla.org
     needs: build
+    if: vars.AMO_PUBLISH == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
