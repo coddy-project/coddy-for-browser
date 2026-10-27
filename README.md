@@ -132,7 +132,7 @@ from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.
   - Chrome 116 or newer;
   - Yandex Browser, or another browser built on Chromium, from the same package as Chrome. Yandex Browser has no
     side panel, so the web UI opens in a window of its own beside the browser's;
-  - Firefox 139 or newer, from the Firefox package. Firefox has no debugger API for extensions, so Coddy clicks and
+  - Firefox 140 or newer, from the Firefox package. Firefox has no debugger API for extensions, so Coddy clicks and
     types through the page: a page can tell such input from a person's, and a site that checks for it (some editors,
     some sign-in forms) does not react.
 - `coddy serve` built with the `browser` and `ui` tags, with its HTTP server on. The release binaries, the Docker image

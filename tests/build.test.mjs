@@ -36,6 +36,11 @@ test("the Firefox build is Manifest V2 with a sidebar, a persistent page and its
   assert.ok(firefox.permissions.includes("<all_urls>"));
   assert.equal(firefox.host_permissions, undefined);
   assert.equal(firefox.optional_host_permissions, undefined);
+  // The data collection permissions need Firefox 140. No gecko_android:
+  // addons.mozilla.org takes it as a claim of Firefox for Android support,
+  // which has neither tab groups nor a sidebar.
+  assert.equal(firefox.browser_specific_settings.gecko.strict_min_version, "140.0");
+  assert.equal(firefox.browser_specific_settings.gecko_android, undefined);
   assert.equal(firefox.sidebar_action.default_panel, "panel.html");
   assert.equal(firefox.browser_specific_settings.gecko.id, GECKO_ID);
   assert.equal(firefox.side_panel, undefined);

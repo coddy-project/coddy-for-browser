@@ -4,7 +4,7 @@
 //   dist/chrome    Chrome, Yandex Browser and other Chromium browsers (the
 //                  side panel where the browser has one, a window of its own
 //                  where it has not)
-//   dist/firefox   Firefox 139 and later, Manifest V2 (the sidebar, input
+//   dist/firefox   Firefox 140 and later, Manifest V2 (the sidebar, input
 //                  through the page, screenshots through tabs.captureTab)
 //
 //   dist/coddy-for-browser-chrome-<version>.zip
@@ -54,8 +54,9 @@ export function manifests(m, v) {
   firefox.browser_specific_settings = {
     gecko: {
       id: GECKO_ID,
-      // Tab groups reached extensions in Firefox 139.
-      strict_min_version: "139.0",
+      // Tab groups reached extensions in Firefox 139, the data collection
+      // permissions below in Firefox 140.
+      strict_min_version: "140.0",
       // The extension sends the pages it works on to the Coddy server the
       // user connects it to.
       data_collection_permissions: { required: ["websiteContent", "browsingActivity"] },

@@ -10,7 +10,7 @@
 //   npm run e2e:firefox
 //
 // CODDY_FIREFOX_PATH names the Firefox to run (default: firefox on PATH);
-// Firefox 139 or later. Puppeteer installs the extension over WebDriver BiDi,
+// Firefox 140 or later. Puppeteer installs the extension over WebDriver BiDi,
 // the way about:debugging loads a temporary add-on.
 
 import assert from "node:assert/strict";
