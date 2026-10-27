@@ -3,13 +3,12 @@ name: CI
 # Every push and pull request: the unit tests, the packages of both browser
 # families as downloadable artifacts, and the built extension in a real
 # Chromium and a real Firefox against a mock of Coddy. The jobs run side by
-# side; "CI passed" waits for all of them. A v* tag also publishes a release
-# with the packages attached.
+# side; "CI passed" waits for all of them. Releases are tag-on-merge.yaml and
+# release.yaml.
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -20,10 +19,13 @@ jobs:
     name: Unit tests and packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          package-manager-cache: false
       - run: npm test
       - run: npm run build
       - name: The version of package.json is the version of both manifests
@@ -36,11 +38,11 @@ jobs:
       # One artifact per browser family holding the built extension itself,
       # so the archive GitHub hands out is the package: download one from the
       # run's summary and install it as the README says.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coddy-for-browser-chrome
           path: dist/chrome
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coddy-for-browser-firefox
           path: dist/firefox
@@ -49,17 +51,21 @@ jobs:
     name: Real Chromium against a mock of Coddy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          package-manager-cache: false
       - run: npm run build
-      - run: npm i --no-save playwright
+      # The tools come from package-lock.json; no install script runs.
+      - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
         env:
           CODDY_SCREENSHOT_DIR: screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: e2e-screenshots
@@ -70,16 +76,19 @@ jobs:
     name: Real Firefox against a mock of Coddy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - uses: browser-actions/setup-firefox@v1
+          package-manager-cache: false
+      - uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
         id: firefox
         with:
           firefox-version: latest
       - run: npm run build
-      - run: npm i --no-save puppeteer-core
+      - run: npm ci --ignore-scripts
       - run: npm run e2e:firefox
         env:
           CODDY_FIREFOX_PATH: ${{ steps.firefox.outputs.firefox-path }}
@@ -96,40 +105,3 @@ jobs:
         run: |
           echo "$RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || exit 1; done
-
-  release:
-    name: Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [passed]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    # Secrets cannot be tested in a step's condition; their presence can.
-    env:
-      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
-      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: The tag is the version of package.json
-        run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
-      - run: npm run build
-      # Release Firefox installs only an add-on Mozilla signed. With the
-      # AMO_JWT_ISSUER and AMO_JWT_SECRET secrets set (an API key of
-      # addons.mozilla.org), the Firefox build is signed as an unlisted
-      # add-on and the release carries the .xpi; without them it carries the
-      # unsigned archive alone.
-      - name: Sign the Firefox build
-        if: env.AMO_JWT_ISSUER != ''
-        run: node scripts/sign.mjs
-      - name: Publish the packages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          node scripts/release-notes.mjs "$version" > notes.md
-          shopt -s nullglob
-          gh release create "$GITHUB_REF_NAME" dist/coddy-for-browser-*.zip dist/coddy-for-browser-*.xpi \
-            --title "Coddy for Browser $version" --notes-file notes.md

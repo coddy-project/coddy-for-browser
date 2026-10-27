@@ -6,7 +6,6 @@
   --text: #17171c;
   --muted: #62616d;
   --accent: #7c3aed;
-  --accent-text: #ffffff;
   --danger: #c62828;
   --ok: #15803d;
   --wait: #b45309;
@@ -21,7 +20,6 @@
     --text: #f2f1f7;
     --muted: #a3a1b2;
     --accent: #a78bfa;
-    --accent-text: #15121f;
     --danger: #f87171;
     --ok: #4ade80;
     --wait: #fbbf24;
@@ -115,9 +113,6 @@ p {
   border-radius: var(--radius);
   padding: 12px;
 }
-.card.approval {
-  border-color: var(--wait);
-}
 .origin {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
@@ -202,8 +197,22 @@ button.switch[aria-checked="true"] .switch-thumb {
 }
 .add-site {
   display: flex;
-  gap: 6px;
-  margin: 0 0 6px;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+/* The card of the sites allowed always keeps one step between its blocks -
+   the description, the switch, the field, the list - and a smaller one
+   between the rows of the list. The field's error sits under the field it
+   belongs to. */
+.sites-card > p,
+.sites-card > .switch-field {
+  margin: 0 0 10px;
+}
+.list.sites {
+  gap: 8px;
+}
+#site-error {
+  margin: -4px 0 10px;
 }
 .add-site input {
   flex: 1;
@@ -257,23 +266,54 @@ button {
   color: var(--text);
   cursor: pointer;
 }
+/* A button pointed at brightens, as the web UI's do; the accent is the
+   primary action's alone. */
 button:hover {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--text) 35%, var(--border));
 }
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* The buttons look as the web UI's own do, in whichever theme it sends: the
+   primary action is its Allow and Save, the accent as a tint and a frame with
+   the text in the text colour, never a solid fill; Decline is its quiet
+   refusal, not an alarm. */
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text);
 }
-button.danger {
-  color: var(--danger);
-  border-color: var(--danger);
-  background: transparent;
+button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 75%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+:root[data-theme="light"] button.primary {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) button.primary {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+}
+button.reject {
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--text) 16%, var(--surface));
+  color: color-mix(in srgb, var(--text) 62%, var(--surface));
+}
+button.reject:hover {
+  background: color-mix(in srgb, var(--text) 12%, var(--surface));
+}
+/* The buttons of a question are the web UI's permission buttons. */
+.card.approval .row button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 .list {
   list-style: none;

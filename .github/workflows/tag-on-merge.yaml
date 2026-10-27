@@ -1,0 +1,114 @@
+# A merged pull request into main tags its merge commit with the next version
+# (scripts/next-version.mjs: the patch after the newest X.Y.Z tag, or the
+# version of package.json when that is higher) and releases it: the packages
+# on GitHub, the Chrome Web Store and addons.mozilla.org (release.yaml).
+# A tag pushed with GITHUB_TOKEN fires no other workflow, so the release is
+# called from here.
+#
+# The trigger is the push to main, not pull_request_target: that trigger runs
+# with the base repository's token on events a fork controls, and zizmor's
+# dangerous-triggers audit holds that it cannot be made safe. A push is
+# released when GitHub lists a merged pull request for its commit; a direct
+# push to main releases nothing.
+#
+# A merge is released only while the repository variable RELEASE_ON_MERGE
+# is true; otherwise the workflow is skipped and the version waits for Run
+# workflow or a tag pushed by hand.
+#
+# workflow_dispatch:
+#   - empty: tag HEAD of main (if it has no tag) and release it
+#   - release_tag set: release that existing tag again, for example once the
+#     store credentials are in place
+
+name: Tag release on merge
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release this existing X.Y.Z tag again (no new tag)
+        required: false
+        type: string
+
+concurrency:
+  group: release-tag-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Prepare the release tag
+    if: github.event_name == 'workflow_dispatch' || vars.RELEASE_ON_MERGE == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.finish.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Pick the tag
+        id: finish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if [ -n "$RELEASE_TAG" ]; then
+            [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "The tag must be X.Y.Z, got $RELEASE_TAG" >&2; exit 1; }
+            git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null || { echo "No tag $RELEASE_TAG on origin" >&2; exit 1; }
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" = push ]; then
+            merged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[] | select(.merged_at != null)] | length')"
+            if [ "$merged" = 0 ]; then
+              echo "A direct push to main: nothing to release"
+              echo "tag=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          existing="$(git tag --points-at HEAD | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)"
+          if [ -n "$existing" ]; then
+            echo "HEAD is already released as $existing"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="$(node scripts/next-version.mjs)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Coddy for Browser $tag"
+          # The checkout keeps no credentials in .git; the push names them.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$tag"
+          echo "Tagged $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Release
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    permissions:
+      contents: write
+    # $/ is this repository at the commit that runs, whatever is on disk.
+    uses: $/.github/workflows/release.yaml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets:
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}

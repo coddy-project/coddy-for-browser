@@ -1,8 +1,17 @@
 import { request, el, showError, statusClass } from "./ui.js";
 
-// TRASH is the glyph of a row's Revoke button.
-const TRASH =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13M10 11v6M14 11v6" /></svg>';
+// trashIcon is the glyph of a row's Revoke button, built with DOM calls
+// rather than markup, which the add-on stores' review flags.
+function trashIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", "M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13M10 11v6M14 11v6");
+  svg.append(path);
+  return svg;
+}
 
 // siteLabel reads an entry of the list: an origin as it is, a pattern
 // ("<scheme>://<host>:<ports>") as the host, its ports and, when it names one,
@@ -47,7 +56,7 @@ async function refresh() {
       ...(s.allowed.length
         ? s.allowed.map((origin) => {
             const b = el("button", { type: "button", class: "icon remove", title: "Revoke", "aria-label": "Revoke" });
-            b.innerHTML = TRASH;
+            b.replaceChildren(trashIcon());
             b.onclick = () =>
               request({ type: "revoke", origin })
                 .then(refresh)

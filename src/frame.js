@@ -60,25 +60,6 @@ export function themeOf(raw) {
   return theme;
 }
 
-// textOn picks the text colour for a fill in one of those forms: white or
-// near-black, whichever has the higher WCAG contrast on it, so a button keeps
-// legible text whatever accent the web UI sends. null for anything else.
-export function textOn(colour) {
-  const value = String(colour || "").trim();
-  if (!COLOUR.test(value)) return null;
-  const srgb = value.startsWith("color(");
-  const channels = value
-    .replace(/^color\(srgb|^rgba?\(/, "")
-    .match(/-?(\d+\.?\d*|\.\d+)(e-?\d+)?/g)
-    .slice(0, 3)
-    .map((n) => Math.min(1, Math.max(0, srgb ? Number(n) : Number(n) / 255)));
-  const linear = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const [r, g, b] = channels.map(linear);
-  const fill = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const dark = 0.0066; // the luminance of #15121f
-  return 1.05 / (fill + 0.05) >= (fill + 0.05) / (dark + 0.05) ? "#ffffff" : "#15121f";
-}
-
 // listen serves the frame's messages: frame() is the frame's window,
 // origin() the web UI's origin, onTurn({sessionId, title}) the tab for a turn,
 // onTheme(theme) the web UI's colours.
