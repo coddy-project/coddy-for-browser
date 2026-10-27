@@ -55,7 +55,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root" || { log "cannot cd to $root"; exit 1; }
 
 OUT="dist/security"
-mkdir -p "$OUT/.cache/trivy" "$OUT/.cache/semgrep-home" || { log "cannot create $OUT"; exit 1; }
+mkdir -p "$OUT/.cache/trivy" "$OUT/.cache/semgrep-home" "$OUT/.cache/zizmor" || { log "cannot create $OUT"; exit 1; }
 
 want() {
   case ",$SEC_SCANNERS," in
@@ -120,8 +120,10 @@ if want zizmor; then
   if command -v zizmor >/dev/null 2>&1; then
     ZIZMOR_RUN=(zizmor)
   elif docker_ok; then
+    # The online audits cache GitHub's answers; the container's user has no
+    # home, so the cache is a directory of the reports.
     ZIZMOR_RUN=(docker run --rm --user "$(id -u):$(id -g)" -e GH_TOKEN
-      -v "$root:/src:ro" -w /src "$ZIZMOR_IMAGE")
+      -v "$root:/src:ro" -w /src -v "$root/$OUT/.cache:/cache" "$ZIZMOR_IMAGE" --cache-dir /cache/zizmor)
     pulls+=("$ZIZMOR_IMAGE")
   else
     log "zizmor: no binary on PATH and no docker fallback"; status=1

@@ -154,10 +154,10 @@ test("the release notes name only the stores the release is sent to", () => {
   assert.match(none, /coddy-for-browser-firefox-0\.1\.2\.zip/);
 
   const amo = releaseNotes("0.1.2", { AMO_PUBLISH: "true", CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
-  assert.match(amo, /\[addons\.mozilla\.org\]\(https:\/\/addons\.mozilla\.org\/firefox\/addon\/coddy-for-browser\/\)/);
+  assert.ok(amo.includes("[addons.mozilla.org](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)"));
   assert.doesNotMatch(amo, /Chrome Web Store/);
 
   const both = releaseNotes("0.1.2", { AMO_PUBLISH: "true", CWS_PUBLISH: "true", CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
-  assert.match(both, /chromewebstore\.google\.com\/detail\/abcdefghijklmnopabcdefghijklmnop/);
+  assert.ok(both.includes("[Chrome Web Store](https://chromewebstore.google.com/detail/abcdefghijklmnopabcdefghijklmnop)"));
   assert.match(both, /once their review passes/);
 });

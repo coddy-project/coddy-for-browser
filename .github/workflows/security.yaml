@@ -46,10 +46,11 @@ jobs:
 
       # SARIF goes to code scanning only from trusted events: a fork must
       # never write findings into this repository's code-scanning history.
-      # always(), so a tripped gate still publishes the report that tripped it.
+      # always(), so a tripped gate still publishes the report that tripped it;
+      # a scan that did not run left no file, and its failure is the step above.
       - name: Upload trivy SARIF
         if: >-
-          always() &&
+          always() && hashFiles('dist/security/trivy.sarif') != '' &&
           !(github.event_name == 'pull_request' &&
             github.event.pull_request.head.repo.full_name != github.repository)
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
@@ -58,7 +59,7 @@ jobs:
           category: trivy
       - name: Upload semgrep SARIF
         if: >-
-          always() &&
+          always() && hashFiles('dist/security/semgrep.sarif') != '' &&
           !(github.event_name == 'pull_request' &&
             github.event.pull_request.head.repo.full_name != github.repository)
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
@@ -67,7 +68,7 @@ jobs:
           category: semgrep
       - name: Upload zizmor SARIF
         if: >-
-          always() &&
+          always() && hashFiles('dist/security/zizmor.sarif') != '' &&
           !(github.event_name == 'pull_request' &&
             github.event.pull_request.head.repo.full_name != github.repository)
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
