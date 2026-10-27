@@ -33,16 +33,17 @@ jobs:
             for (const b of ['chrome', 'firefox'])
               if (require('./dist/' + b + '/manifest.json').version !== v) { console.error(b + ' manifest version'); process.exit(1); }
           "
-      # One artifact per browser family, each holding its archive: download
-      # one from the run's summary and install it as the README says.
+      # One artifact per browser family holding the built extension itself,
+      # so the archive GitHub hands out is the package: download one from the
+      # run's summary and install it as the README says.
       - uses: actions/upload-artifact@v4
         with:
           name: coddy-for-browser-chrome
-          path: dist/coddy-for-browser-chrome-*.zip
+          path: dist/chrome
       - uses: actions/upload-artifact@v4
         with:
           name: coddy-for-browser-firefox
-          path: dist/coddy-for-browser-firefox-*.zip
+          path: dist/firefox
 
   e2e-chromium:
     name: Real Chromium against a mock of Coddy

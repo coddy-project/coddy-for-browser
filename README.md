@@ -73,9 +73,10 @@ from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.
 
 ## Install
 
-Every [release](https://github.com/coddy-project/coddy-for-browser/releases) carries the packages, and so does every
-run of the [CI workflow](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml) under its
-artifacts (`coddy-for-browser-chrome`, `coddy-for-browser-firefox`; downloading an artifact needs a GitHub account).
+Every [release](https://github.com/coddy-project/coddy-for-browser/releases) carries the packages. Every run of the
+[CI workflow](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml) keeps a build of each
+family among its artifacts, `coddy-for-browser-chrome` and `coddy-for-browser-firefox`: the archive GitHub hands out is
+the same package as the release's, unsigned (downloading an artifact needs a GitHub account).
 
 | Package | Browsers |
 | --- | --- |

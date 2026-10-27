@@ -75,9 +75,10 @@
 
 ## Установка
 
-Пакеты прикреплены к каждому [релизу](https://github.com/coddy-project/coddy-for-browser/releases), а ещё лежат в
-артефактах каждого прогона [CI](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml)
-(`coddy-for-browser-chrome`, `coddy-for-browser-firefox`; чтобы скачать артефакт, нужна учётная запись GitHub).
+Пакеты прикреплены к каждому [релизу](https://github.com/coddy-project/coddy-for-browser/releases). Каждый прогон
+[CI](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml) сохраняет сборку для каждого
+семейства браузеров в артефактах `coddy-for-browser-chrome` и `coddy-for-browser-firefox`. Архив, который отдаёт
+GitHub, - тот же пакет, что и в релизе, только без подписи (чтобы скачать артефакт, нужна учётная запись GitHub).
 
 | Пакет | Браузеры |
 | --- | --- |
