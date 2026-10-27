@@ -4,7 +4,7 @@ import { request, el, showError } from "./ui.js";
 const choices = [
   ["chat", "Allow for this chat", "primary"],
   ["always", "Always allow", ""],
-  ["deny", "Decline", "danger"],
+  ["deny", "Decline", "reject"],
 ];
 
 // approvalCard asks whether Coddy may act on a website, or whether a chat of

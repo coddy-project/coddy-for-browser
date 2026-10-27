@@ -39,6 +39,29 @@ const waitFor = async (what, ok, timeout = 15000) => {
   }
 };
 
+// buttonLook reads how a question's buttons are painted. They follow the web
+// UI's own: the primary one is a tint of the accent with the page's text
+// colour on it, never a solid fill, and Decline is not the colour of danger.
+const buttonLook = (page) =>
+  page.evaluate(() => {
+    const css = (el) => getComputedStyle(el);
+    const alpha = (c) => Number((c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/) || [0, 1])[1]);
+    const card = document.querySelector(".card.approval");
+    const primary = card.querySelector("button.primary");
+    const reject = card.querySelector("button.reject");
+    const probe = document.createElement("span");
+    probe.style.color = "var(--danger)";
+    document.body.append(probe);
+    const danger = css(probe).color;
+    probe.remove();
+    return {
+      tint: alpha(css(primary).backgroundColor) < 0.5,
+      text: css(primary).color === css(document.body).color,
+      quietDecline: Boolean(reject) && css(reject).color !== danger,
+    };
+  });
+const tinted = { tint: true, text: true, quietDecline: true };
+
 const coddy = await startMockCoddy({ key });
 const { context, close } = await launchChromium(chromium, extension);
 const errors = [];
@@ -125,6 +148,7 @@ try {
   await approval.getByRole("button", { name: "Always allow" }).waitFor();
   await approval.setViewportSize({ width: 420, height: 520 });
   await capture(approval, "site-approval", [420]);
+  assert.deepEqual(await buttonLook(approval), tinted);
   await approval.getByRole("button", { name: "Always allow" }).click();
   const opened = await opening;
   assert.equal(opened.url, coddy.base + "/fixture");
@@ -227,6 +251,8 @@ try {
   await panel.getByText("A chat of another Coddy asks to use this browser").waitFor();
   await panel.getByText('The chat "Trip" runs on laptop').waitFor();
   await capture(panel, "panel-remote-chat", [420], { fit: false });
+  // In the panel the colours are the web UI's own theme.
+  assert.deepEqual(await buttonLook(panel), tinted);
   await panel.getByRole("button", { name: "Allow for this chat" }).click();
   await panel.getByText("Coddy asks to use a website").waitFor();
   assert.equal(await panel.getByRole("button", { name: "Always allow" }).count(), 0);
