@@ -156,15 +156,16 @@ sequenceDiagram
 
 ## Установка
 
-Пакеты прикреплены к каждому [релизу](https://github.com/coddy-project/coddy-for-browser/releases). Каждый прогон
+Пакеты прикреплены к каждому [релизу](https://github.com/coddy-project/coddy-for-browser/releases), а сам релиз
+уходит ещё в Chrome Web Store и на addons.mozilla.org, которые публикуют его после своей проверки. Ссылки на страницы
+в магазинах есть в заметках к релизу. Каждый прогон
 [CI](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml) сохраняет сборку для каждого
 семейства браузеров в артефактах `coddy-for-browser-chrome` и `coddy-for-browser-firefox`. Архив, который отдаёт
-GitHub, - тот же пакет, что и в релизе, только без подписи (чтобы скачать артефакт, нужна учётная запись GitHub).
+GitHub, - тот же пакет, что и в релизе (чтобы скачать артефакт, нужна учётная запись GitHub).
 
 | Пакет | Браузеры |
 | --- | --- |
 | `coddy-for-browser-chrome-<version>.zip` | Chrome, Яндекс Браузер и другие браузеры на Chromium |
-| `coddy-for-browser-firefox-<version>.xpi` | Firefox, с подписью Mozilla (в релизе, который был подписан) |
 | `coddy-for-browser-firefox-<version>.zip` | Firefox, без подписи |
 
 ### Chrome
@@ -183,8 +184,7 @@ GitHub, - тот же пакет, что и в релизе, только без
 
 ### Firefox
 
-- **С подписью** (`.xpi`). Откройте файл в Firefox или перетащите его на страницу `about:addons` и подтвердите
-  установку. Firefox хранит его как любое другое дополнение;
+- **С addons.mozilla.org**, когда версия там опубликована. Устанавливается как любое другое дополнение;
 - **Без подписи** (`.zip`). Обычный Firefox ставит только дополнения, подписанные Mozilla. Откройте
   `about:debugging#/runtime/this-firefox`, нажмите **Загрузить временное дополнение** и выберите архив. Временное
   дополнение Firefox удаляет при закрытии. Firefox Developer Edition и Nightly оставляют архив без подписи
@@ -292,9 +292,33 @@ Google Chrome или Яндекс Браузер. Такой браузер по
 `CODDY_SCREENSHOT_DIR` собирает скриншоты страниц расширения.
 
 [CI](.github/workflows/ci.yaml) на каждый пуш и пул-реквест запускает модульные тесты, собирает оба пакета в
-артефакты и прогоняет обе сквозные проверки. Тег `v<version>` публикует релиз с прикреплёнными пакетами. Если заданы
-секреты `AMO_JWT_ISSUER` и `AMO_JWT_SECRET` (API-ключ addons.mozilla.org), сборка для Firefox ещё и подписывается как
-дополнение вне каталога, и к релизу прикрепляется `.xpi` (`scripts/sign.mjs`).
+артефакты и прогоняет обе сквозные проверки.
+
+### Релизы
+
+Слияние пул-реквеста в `main` выпускает релиз. [tag-on-merge.yaml](.github/workflows/tag-on-merge.yaml) ставит на
+коммит слияния тег следующей версии. Это следующий патч после самого нового тега `X.Y.Z` или версия из `package.json`,
+если она выше, поэтому минорную или мажорную версию пул-реквест поднимает правкой `package.json`. Затем
+[release.yaml](.github/workflows/release.yaml) собирает эту версию в оба манифеста, прикрепляет пакеты к релизу на
+GitHub и отправляет их в Chrome Web Store и на addons.mozilla.org, а магазины публикуют версию после своей проверки.
+Прямой пуш в `main` ничего не выпускает. **Run workflow** у *Tag release on merge* ставит тег на вершину `main`, а с
+указанным тегом выпускает этот тег заново.
+
+Каждый магазин нужно один раз настроить. Пока это не сделано, его задание пишет, чего не хватает, и релиз выходит без
+этого магазина.
+
+- **Chrome Web Store** (`scripts/publish-chrome.mjs`, API v2). Зарегистрируйтесь как разработчик, создайте элемент,
+  вручную загрузив первый пакет в панели разработчика, и заполните в нём вкладки с описанием для магазина и
+  конфиденциальностью. Затем включите Chrome Web Store API в проекте Google Cloud, создайте OAuth-клиент и получите
+  refresh token для области `https://www.googleapis.com/auth/chromewebstore`, как описано в
+  [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api). Репозиторию нужны секреты
+  `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` и `CWS_REFRESH_TOKEN` и переменные `CWS_PUBLISHER_ID` (Publisher, Settings в
+  панели) и `CWS_EXTENSION_ID` (id элемента). Яндекс Браузер тоже ставит расширения из Chrome Web Store.
+- **addons.mozilla.org** (`scripts/sign.mjs listed`). API-ключ из кабинета разработчика (Tools, Manage API Keys)
+  кладётся в секреты `AMO_JWT_ISSUER` и `AMO_JWT_SECRET`. Первая отправка создаёт страницу дополнения с метаданными из
+  `amo/metadata.json`, а каждую версию Mozilla проверяет до публикации. `node scripts/sign.mjs unlisted` вместо этого
+  подписывает сборку для самостоятельной раздачи. Номера версий на AMO общие для обоих каналов, поэтому одна версия
+  уходит только в один из них.
 
 | Файл | Что делает |
 | --- | --- |
@@ -307,7 +331,8 @@ Google Chrome или Яндекс Браузер. Такой браузер по
 | `src/groups.js` | Группы вкладок Coddy и то, какой чат держит какую вкладку. |
 | `src/approvals.js`, `src/policy.js` | Одобрение сайтов и проверка адресов. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | Что выполняется на странице, ввод через протокол DevTools (Chrome) или через страницу (Firefox), индикатор работы. |
-| `scripts/build.mjs`, `scripts/sign.mjs` | Сборка для каждого семейства браузеров (манифест Firefox - Manifest V2) и подпись сборки для Firefox. |
+| `scripts/build.mjs` | Сборка для каждого семейства браузеров (манифест Firefox - Manifest V2). |
+| `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | Версия следующего релиза, загрузка в Chrome Web Store и отправка на addons.mozilla.org. |
 
 Изменение протокола вносится в оба репозитория, в расширение и в `external/browser` в coddy-agent, вместе со страницей
 протокола в том же изменении.

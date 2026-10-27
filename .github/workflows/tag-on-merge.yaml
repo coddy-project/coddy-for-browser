@@ -1,0 +1,89 @@
+# A merged pull request into main tags its merge commit with the next version
+# (scripts/next-version.mjs: the patch after the newest X.Y.Z tag, or the
+# version of package.json when that is higher) and releases it: the packages
+# on GitHub, the Chrome Web Store and addons.mozilla.org (release.yaml).
+# A direct push to main does not release. A tag pushed with GITHUB_TOKEN fires
+# no other workflow, so the release is called from here.
+#
+# workflow_dispatch:
+#   - empty: tag HEAD of main (if it has no tag) and release it
+#   - release_tag set: release that existing tag again, for example once the
+#     store credentials are in place
+
+name: Tag release on merge
+
+# pull_request_target, not pull_request, so the tag push gets a read-write
+# token for a pull request from a fork as well. The job runs only once the
+# pull request is merged, on the merge commit, which is main's own code.
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release this existing X.Y.Z tag again (no new tag)
+        required: false
+        type: string
+
+concurrency:
+  group: release-tag-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Prepare the release tag
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.finish.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Pick the tag
+        id: finish
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if [ -n "$RELEASE_TAG" ]; then
+            [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "The tag must be X.Y.Z, got $RELEASE_TAG" >&2; exit 1; }
+            git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null || { echo "No tag $RELEASE_TAG on origin" >&2; exit 1; }
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          existing="$(git tag --points-at HEAD | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)"
+          if [ -n "$existing" ]; then
+            echo "HEAD is already released as $existing"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="$(node scripts/next-version.mjs)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Coddy for Browser $tag"
+          git push origin "$tag"
+          echo "Tagged $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Release
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yaml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit

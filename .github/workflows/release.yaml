@@ -1,0 +1,109 @@
+# Releases an X.Y.Z tag: tests and builds it with that version in both
+# manifests, attaches the packages to a GitHub release, and submits them to
+# the Chrome Web Store and addons.mozilla.org, which publish the version once
+# their review passes. tag-on-merge.yaml calls it after tagging a merged pull
+# request; a tag pushed by hand runs it too.
+#
+# A store whose credentials are not set is skipped with a notice, so the
+# GitHub release goes out either way (README, Releases):
+#   - Chrome Web Store: secrets CWS_CLIENT_ID, CWS_CLIENT_SECRET,
+#     CWS_REFRESH_TOKEN and variables CWS_PUBLISHER_ID, CWS_EXTENSION_ID;
+#   - addons.mozilla.org: secrets AMO_JWT_ISSUER, AMO_JWT_SECRET.
+
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  packages:
+    name: Packages and GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: The tag is the version of the build
+        run: |
+          [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "The tag must be X.Y.Z, got $TAG" >&2; exit 1; }
+          npm version --no-git-tag-version --allow-same-version "$TAG"
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: dist/coddy-for-browser-*.zip
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: |
+          node scripts/release-notes.mjs "$TAG" > notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/coddy-for-browser-*.zip --clobber
+          else
+            gh release create "$TAG" dist/coddy-for-browser-*.zip --verify-tag \
+              --title "Coddy for Browser $TAG" --notes-file notes.md
+          fi
+
+  chrome-web-store:
+    name: Chrome Web Store
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: dist
+      - name: Upload and submit for review
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: node scripts/publish-chrome.mjs "dist/coddy-for-browser-chrome-$TAG.zip"
+
+  firefox-add-ons:
+    name: addons.mozilla.org
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the version of the tag
+        run: |
+          npm version --no-git-tag-version --allow-same-version "$TAG"
+          npm run build
+      - name: Submit to the listing for review
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: node scripts/sign.mjs listed

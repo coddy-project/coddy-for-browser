@@ -1,0 +1,16 @@
+{
+  "slug": "coddy-for-browser",
+  "summary": {
+    "en-US": "Lets your own self-hosted Coddy agent work in your browser: its web UI in the sidebar, chats that read and act in the tabs you share, and a question before each new website."
+  },
+  "categories": {
+    "firefox": ["web-development", "tabs"]
+  },
+  "homepage": {
+    "en-US": "https://github.com/coddy-project/coddy-for-browser"
+  },
+  "requires_payment": false,
+  "version": {
+    "license": "MIT"
+  }
+}

@@ -152,15 +152,15 @@ from Coddy's side, with its configuration, is [Coddy for Browser](https://coddy.
 
 ## Install
 
-Every [release](https://github.com/coddy-project/coddy-for-browser/releases) carries the packages. Every run of the
-[CI workflow](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml) keeps a build of each
-family among its artifacts, `coddy-for-browser-chrome` and `coddy-for-browser-firefox`: the archive GitHub hands out is
-the same package as the release's, unsigned (downloading an artifact needs a GitHub account).
+Every [release](https://github.com/coddy-project/coddy-for-browser/releases) carries the packages and goes to the
+Chrome Web Store and addons.mozilla.org as well, which publish it once their review passes; its notes link the
+listings. Every run of the [CI workflow](https://github.com/coddy-project/coddy-for-browser/actions/workflows/ci.yaml)
+keeps a build of each family among its artifacts, `coddy-for-browser-chrome` and `coddy-for-browser-firefox`: the
+archive GitHub hands out is the same package as the release's (downloading an artifact needs a GitHub account).
 
 | Package | Browsers |
 | --- | --- |
 | `coddy-for-browser-chrome-<version>.zip` | Chrome, Yandex Browser and other Chromium browsers |
-| `coddy-for-browser-firefox-<version>.xpi` | Firefox, signed by Mozilla (in a release that was signed) |
 | `coddy-for-browser-firefox-<version>.zip` | Firefox, unsigned |
 
 ### Chrome
@@ -177,8 +177,7 @@ The toolbar button opens the web UI in a window of its own, placed at the right 
 
 ### Firefox
 
-- **Signed** (`.xpi`): open the file in Firefox, or drag it onto `about:addons`, and confirm the installation. Firefox
-  keeps it like any add-on.
+- **From addons.mozilla.org**, once the version is published there: like any add-on.
 - **Unsigned** (`.zip`): release Firefox installs only add-ons Mozilla signed. Open
   `about:debugging#/runtime/this-firefox`, press **Load Temporary Add-on** and choose the archive; Firefox removes a
   temporary add-on when it closes. Firefox Developer Edition and Nightly keep the unsigned archive installed from
@@ -284,9 +283,33 @@ Yandex Browser - which gets the extension through the DevTools protocol, since b
 screenshots of the extension's pages.
 
 The [CI workflow](.github/workflows/ci.yaml) runs the unit tests, builds both packages as artifacts and runs both
-end-to-end runs on every push and pull request. A `v<version>` tag publishes a release with the packages attached; with
-the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` secrets (an API key of addons.mozilla.org) it also signs the Firefox build as
-an unlisted add-on and attaches the `.xpi` (`scripts/sign.mjs`).
+end-to-end runs on every push and pull request.
+
+### Releases
+
+Merging a pull request into `main` releases it. [tag-on-merge.yaml](.github/workflows/tag-on-merge.yaml) tags the merge
+commit with the next version: the patch after the newest `X.Y.Z` tag, or the version of `package.json` when that is
+higher, so a pull request raises the minor or major version by editing `package.json`. Then
+[release.yaml](.github/workflows/release.yaml) builds that version into both manifests, attaches the packages to a
+GitHub release and submits them to the Chrome Web Store and addons.mozilla.org, which publish the version once their
+review passes. A direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of
+`main`, or, with a tag given, releases that tag again.
+
+Each store needs a one-time setup. Until it is done, its job prints what is missing and the release goes out without
+that store.
+
+- **Chrome Web Store** (`scripts/publish-chrome.mjs`, API v2). Register as a developer, create the item by uploading the
+  first package by hand in the developer dashboard, and fill in its store listing and privacy tabs. Then enable the
+  Chrome Web Store API in a Google Cloud project, create an OAuth client and get a refresh token for the
+  `https://www.googleapis.com/auth/chromewebstore` scope, as
+  [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api) shows. The repository needs the
+  secrets `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and `CWS_REFRESH_TOKEN`, and the variables `CWS_PUBLISHER_ID` (Publisher,
+  Settings in the dashboard) and `CWS_EXTENSION_ID` (the item's id). Yandex Browser installs extensions from the
+  Chrome Web Store too.
+- **addons.mozilla.org** (`scripts/sign.mjs listed`). An API key from the developer hub (Tools, Manage API Keys) goes
+  into the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. The first submission creates the listing with the metadata of
+  `amo/metadata.json`, and Mozilla reviews every version before it is public. `node scripts/sign.mjs unlisted` signs a
+  build for self-distribution instead; AMO numbers versions across both channels, so one version goes to one of them.
 
 | File | What it does |
 | --- | --- |
@@ -299,7 +322,8 @@ an unlisted add-on and attaches the `.xpi` (`scripts/sign.mjs`).
 | `src/groups.js` | The Coddy tab groups and who holds which tab. |
 | `src/approvals.js`, `src/policy.js` | Website approvals and address checks. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | What runs in a page, input through the DevTools protocol (Chrome) or through the page (Firefox), the working indicator. |
-| `scripts/build.mjs`, `scripts/sign.mjs` | The build of each browser family (the Firefox manifest is Manifest V2) and the signing of the Firefox one. |
+| `scripts/build.mjs` | The build of each browser family (the Firefox manifest is Manifest V2). |
+| `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | The version of the next release, the upload to the Chrome Web Store and the submission to addons.mozilla.org. |
 
 A change to the protocol goes to both repositories: the extension and `external/browser` in coddy-agent, with the
 protocol page updated in the same change.
