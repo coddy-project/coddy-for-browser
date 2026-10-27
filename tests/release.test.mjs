@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { nextVersion } from "../scripts/next-version.mjs";
 import { publishChrome, CHROME_KEYS } from "../scripts/publish-chrome.mjs";
-import { amoToken, amoHasVersion } from "../scripts/sign.mjs";
+import { amoToken, amoHasVersion, amoHasAddon, amoMetadata } from "../scripts/sign.mjs";
 import { releaseNotes } from "../scripts/release-notes.mjs";
+import { changelogSection, plainText } from "../scripts/changelog.mjs";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 
 test("the first release takes the version of package.json", () => {
   assert.equal(nextVersion([], "0.1.0"), "0.1.0");
@@ -160,4 +162,63 @@ test("the release notes name only the stores the release is sent to", () => {
   const both = releaseNotes("0.1.2", { AMO_PUBLISH: "true", CWS_PUBLISH: "true", CWS_EXTENSION_ID: "abcdefghijklmnopabcdefghijklmnop" });
   assert.ok(both.includes("[Chrome Web Store](https://chromewebstore.google.com/detail/abcdefghijklmnopabcdefghijklmnop)"));
   assert.match(both, /once their review passes/);
+});
+
+const CHANGELOG = `# Changelog
+
+Intro.
+
+## 0.1.3
+
+- One \`thing\` with **emphasis** and a [link](https://example.com), whose line
+  wraps.
+- Another.
+
+## 0.1.2
+
+- Older.
+`;
+
+test("a version's section of the changelog, as Markdown for GitHub and plain text for AMO", () => {
+  assert.equal(changelogSection(CHANGELOG, "0.1.3"), "- One `thing` with **emphasis** and a [link](https://example.com), whose line\n  wraps.\n- Another.");
+  assert.equal(changelogSection(CHANGELOG, "0.1.2"), "- Older.");
+  assert.equal(changelogSection(CHANGELOG, "9.9.9"), "");
+  assert.equal(plainText(changelogSection(CHANGELOG, "0.1.3")), "- One thing with emphasis and a link (https://example.com), whose line wraps.\n- Another.");
+});
+
+test("the release notes say what changed when the changelog has the version", () => {
+  const notes = releaseNotes("0.1.3", {}, CHANGELOG);
+  assert.match(notes, /## What changed\n\n- One `thing`/);
+  assert.doesNotMatch(notes, /Older/);
+  assert.doesNotMatch(releaseNotes("9.9.9", {}, CHANGELOG), /What changed/);
+});
+
+test("a new AMO version carries its notes and leaves an existing listing as its authors edited it", () => {
+  const listing = { slug: "coddy-for-browser", summary: { "en-US": "s" }, version: { license: "MIT" } };
+  const args = { listing, releaseNotes: "- notes", approvalNotes: "how to test" };
+  assert.deepEqual(amoMetadata({ ...args, exists: true }), {
+    version: { license: "MIT", release_notes: { "en-US": "- notes" }, approval_notes: "how to test" },
+  });
+  const created = amoMetadata({ ...args, exists: false });
+  assert.equal(created.slug, "coddy-for-browser");
+  assert.equal(created.version.approval_notes, "how to test");
+  assert.deepEqual(amoMetadata({ listing, exists: true, releaseNotes: "", approvalNotes: "" }), { version: { license: "MIT" } });
+  assert.deepEqual(listing.version, { license: "MIT" });
+});
+
+test("AMO is asked whether the listing exists before a version is sent", async () => {
+  const status = { a: 200, b: 404, c: 500 };
+  const fetch = async (url) => new Response("{}", { status: status[String(url).includes("guid-a") ? "a" : String(url).includes("guid-b") ? "b" : "c"] });
+  const args = { fetch, issuer: "user:1:2", secret: "s3cret" };
+  assert.equal(await amoHasAddon({ ...args, guid: "guid-a" }), true);
+  assert.equal(await amoHasAddon({ ...args, guid: "guid-b" }), false);
+  await assert.rejects(amoHasAddon({ ...args, guid: "guid-c" }), /HTTP 500/);
+});
+
+test("the version of package.json has its section in CHANGELOG.md, and the reviewers their notes", async () => {
+  const { version } = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const changelog = await fs.readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  assert.notEqual(changelogSection(changelog, version), "", `CHANGELOG.md has no "## ${version}"`);
+  const approval = await fs.readFile(new URL("../amo/approval-notes.txt", import.meta.url), "utf8");
+  assert.match(approval, /How to test/);
 });
