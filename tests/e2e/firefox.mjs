@@ -80,6 +80,10 @@ const browser = await puppeteer.launch({
   browser: "firefox",
   executablePath: firefoxPath(),
   headless: true,
+  // Firefox 150 and later let WebDriver BiDi open privileged pages - the
+  // extension's own moz-extension: pages - only with this switch; older
+  // versions ignore it.
+  args: ["-remote-allow-system-access"],
   extraPrefsFirefox: {
     "extensions.webextensions.uuids": JSON.stringify({ [GECKO_ID]: uuid }),
     "intl.locale.requested": "en-US",
@@ -179,7 +183,9 @@ try {
   await assert.rejects(remote, (e) => e.data?.reason === "chat_declined");
 
   // Disconnect on the settings page withdraws everything.
-  await options.bringToFront();
+  // Firefox 150 and later refuse to activate a privileged page over BiDi;
+  // the click needs no focus.
+  await options.bringToFront().catch(() => {});
   await options.locator("#disconnect").click();
   await waitFor("browser/stop", () => coddy.state.stops === 1);
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
