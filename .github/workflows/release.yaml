@@ -12,7 +12,8 @@
 # A store job runs only when its repository variable is true, CWS_PUBLISH
 # for the Chrome Web Store and AMO_PUBLISH for addons.mozilla.org; otherwise
 # it is skipped and the release goes out without that store. A store job whose
-# credentials are not set says what is missing and passes (README, Releases):
+# credentials are not set says what is missing and passes (CONTRIBUTING.md,
+# Releases):
 #   - Chrome Web Store: secrets CWS_CLIENT_ID, CWS_CLIENT_SECRET,
 #     CWS_REFRESH_TOKEN and variables CWS_PUBLISHER_ID, CWS_EXTENSION_ID;
 #   - addons.mozilla.org: secrets AMO_JWT_ISSUER, AMO_JWT_SECRET.

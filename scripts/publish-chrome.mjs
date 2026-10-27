@@ -11,8 +11,9 @@
 //
 // The item has to exist: the first version is uploaded by hand in the
 // developer dashboard, with its store listing and privacy tabs filled in.
-// Credentials come from the environment (README, Releases): an OAuth client
-// and its refresh token for the scope https://www.googleapis.com/auth/chromewebstore,
+// Credentials come from the environment (CONTRIBUTING.md, Releases): an
+// OAuth client and its refresh token for the scope
+// https://www.googleapis.com/auth/chromewebstore,
 // the publisher id and the extension id. Without them the script says what is
 // missing and exits successfully, so a release without the store still goes
 // out.
