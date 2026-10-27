@@ -214,11 +214,6 @@ body.panel {
   gap: 6px;
   padding: 6px 8px;
 }
-.status.dot-only {
-  margin-left: 0;
-  font-size: 0;
-  gap: 0;
-}
 button.icon {
   width: 28px;
   height: 28px;
@@ -241,13 +236,6 @@ button.icon svg {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-button.icon.danger {
-  color: var(--danger);
-}
-button.icon.danger svg {
-  fill: currentColor;
-  stroke: none;
 }
 .tabbar {
   flex: 1;

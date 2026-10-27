@@ -2,7 +2,7 @@
 // server: connect, open a tab with the site approval, read and act on the
 // page, files both ways, another chat refused, turnEnded, the side panel's
 // web UI signed in by its ticket and a turn sent from it with the person's
-// tab, a chat of another Coddy asking first, Stop.
+// tab, a chat of another Coddy asking first, Disconnect on the settings page.
 //
 //   npm run build
 //   npm i --no-save playwright   # once; or NODE_PATH pointing at one
@@ -204,16 +204,20 @@ try {
     coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "laptop/sess_trip"),
   );
 
-  // release hands the tab back to the shared group; Stop withdraws everything.
+  // release hands the tab back to the shared group; Disconnect on the
+  // settings page stops everything, and the panel has no Stop of its own.
   assert.deepEqual(await coddy.command("release", {}), { released: 1 });
   await waitFor("the opened tab in the shared group", () => coddy.state.tabs.find((t) => t.id === opened.tabId && !t.sessionId));
-  await panel.getByRole("button", { name: "Stop Coddy" }).click();
+  assert.equal(await panel.locator("#stop-all, #status").count(), 0);
+  await options.getByRole("button", { name: "Disconnect" }).click();
   await waitFor("browser/stop", () => coddy.state.stops === 1);
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
+  await options.getByRole("button", { name: "Save and connect" }).click();
+  await options.locator("#status").getByText("Connected", { exact: true }).waitFor({ timeout: 15000 });
   await assert.rejects(coddy.command("snapshot", tab), (e) => ["stopped", "not_shared"].includes(e.data?.reason));
 
   assert.deepEqual(errors, []);
-  // Stop took back what the chat of another Coddy was allowed.
+  // The stop took back what the chat of another Coddy was allowed.
   const again = coddy.command("open_tab", { params: { url: coddy.base + "/fixture?again" }, session: laptop });
   again.catch(() => {}); // refused before the assertion below takes it
   await panel.getByText("A chat of another Coddy asks to use this browser").waitFor();
@@ -221,7 +225,7 @@ try {
   await assert.rejects(again, (e) => e.data?.reason === "chat_declined");
 
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Stop");
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Disconnect");
 } finally {
   await close();
   await coddy.close();

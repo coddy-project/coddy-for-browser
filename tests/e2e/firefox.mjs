@@ -3,7 +3,7 @@
 // it through the page (Firefox has no debugger API), a screenshot through
 // tabs.captureTab, files both ways, the side panel's web UI signed in by its
 // ticket with a turn from the person's tab, a chat of another Coddy asking
-// first, Stop.
+// first, Disconnect.
 //
 //   npm run build
 //   npm i --no-save puppeteer-core   # once; or NODE_PATH pointing at one
@@ -178,13 +178,14 @@ try {
   await panel.locator("::-p-text(Decline)").click();
   await assert.rejects(remote, (e) => e.data?.reason === "chat_declined");
 
-  // Stop withdraws everything.
-  await panel.locator("#stop-all").click();
+  // Disconnect on the settings page withdraws everything.
+  await options.bringToFront();
+  await options.locator("#disconnect").click();
   await waitFor("browser/stop", () => coddy.state.stops === 1);
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS (Firefox): connect, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Stop");
+  console.log("PASS (Firefox): connect, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
 } catch (e) {
   console.error(e);
   process.exitCode = 1;

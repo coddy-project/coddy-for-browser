@@ -1,11 +1,12 @@
 // The side panel: the web UI of the Coddy server the extension is connected
 // to, in a frame, under a strip of the extension's own - the tab you look at
-// with Share and Take back, the connection, Stop. A turn sent from the web UI
+// with Share and Take back, and the settings. The connection and Disconnect
+// are on the settings page, Stop on the page Coddy works in. A turn sent from the web UI
 // takes the tab you look at into its chat's tab group first. The same page is
 // Chrome's side panel, Firefox's sidebar and, in Yandex Browser, a window of
 // its own beside the browser's, which names that window in its address.
 import { api } from "./platform.js";
-import { request, el, showError, statusClass } from "./ui.js";
+import { request, el, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
 import { frameURL, listen } from "./frame.js";
 
@@ -79,10 +80,6 @@ async function refresh() {
     return;
   }
   if (loaded && (!state.settings.enabled || loaded !== state.settings.address)) unload();
-  const status = $("status");
-  status.title = state.status;
-  status.textContent = state.status;
-  status.className = "status dot-only " + statusClass(state.status);
   const offline = state.status !== "Connected";
   $("offline").hidden = !offline;
   $("offline-text").textContent = state.settings.enabled ? `Coddy: ${state.status}` : "Connect the extension to your Coddy server.";
@@ -115,10 +112,6 @@ listen(window, {
 });
 
 $("settings").onclick = $("open-settings").onclick = () => api.runtime.openOptionsPage();
-$("stop-all").onclick = () =>
-  request({ type: "stop" })
-    .then(refresh)
-    .catch(showError);
 
 windowId = Number(new URLSearchParams(location.search).get("window")) || (await api.windows.getCurrent()).id;
 await refresh();
