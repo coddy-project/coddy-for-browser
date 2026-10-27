@@ -11,7 +11,7 @@ import { Debugger, cdpInput } from "./input.js";
 import { pageInput } from "./pageinput.js";
 import { indicator } from "./indicator.js";
 import { api, action, capabilities } from "./platform.js";
-import { serverURL, checkKey, checkName, isWebPage } from "./policy.js";
+import { serverURL, checkKey, checkName, isWebPage, siteEntry } from "./policy.js";
 
 const version = api.runtime.getManifest().version;
 const caps = capabilities(api);
@@ -206,6 +206,7 @@ async function state(msg = {}) {
     chats: groups.chats(),
     pending: approvals.list(),
     allowed: approvals.grants.always,
+    allowAll: approvals.grants.all,
     version,
   };
 }
@@ -259,6 +260,14 @@ const handlers = {
   },
   async revoke({ origin }) {
     await approvals.revoke(origin);
+  },
+  async allowSite({ site }) {
+    const entry = siteEntry(site);
+    await approvals.addAlways(entry);
+    return entry;
+  },
+  async setAllowAll({ on }) {
+    await approvals.setAll(on);
   },
 };
 

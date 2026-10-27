@@ -60,31 +60,97 @@ export function isLocalOrigin(origin) {
 // other entry, and the list remembers it.
 export const LOCAL_SITES = ["*://localhost:*", "*://127.0.0.1:*", "*://[::1]:*"];
 
-// covers says whether an "always" entry takes in origin: the origin itself, or
-// a "*://<host>:*" entry for every port of that host.
+// An entry of the list is an origin, or "<scheme>://<host>:<ports>" where the
+// scheme may be "*" (http or https) and the ports one port, a range "lo-hi"
+// or "*" (any).
+const PATTERN = /^(\*|https?):\/\/(\[[0-9a-f:.]+\]|[^:[\]/]+):(\*|\d{1,5}(?:-\d{1,5})?)$/;
+
+function inPorts(ports, port) {
+  if (ports === "*") return true;
+  const [lo, hi = lo] = ports.split("-").map(Number);
+  return Number(port) >= lo && Number(port) <= hi;
+}
+
+function parts(origin) {
+  const url = new URL(origin);
+  const scheme = url.protocol.slice(0, -1);
+  return { scheme, host: url.hostname, port: url.port || (scheme === "https" ? "443" : "80") };
+}
+
+// covers says whether an "always" entry takes in origin.
 export function covers(entry, origin) {
   if (entry === origin) return true;
-  const host = /^\*:\/\/(.+):\*$/.exec(entry)?.[1];
-  if (!host) return false;
+  const m = PATTERN.exec(entry);
+  if (!m) return false;
   try {
-    return new URL(origin).hostname === host;
+    const o = parts(origin);
+    return (m[1] === "*" || m[1] === o.scheme) && m[2] === o.host && inPorts(m[3], o.port);
   } catch {
     return false;
   }
 }
 
+// namesPort says whether an entry names one port: the person's word for what
+// listens there, the Coddy server included. A range is as wide as "*".
+function namesPort(entry) {
+  const m = PATTERN.exec(entry);
+  return !m || /^\d+$/.test(m[3]);
+}
+
+// siteEntry reads an address the person adds to the list beforehand:
+//   https://example.com, http://10.0.0.5:8080   that origin
+//   localhost:3000                               that port, http or https
+//   example.com:1000-2000                        those ports, http or https
+//   example.com, example.com:*, *://example.com  every port, http or https
+//   http://example.com:*                         every port, one scheme
+export function siteEntry(input) {
+  const text = String(input || "").trim().toLowerCase();
+  if (!text) throw new Error("Enter an address");
+  const bad = () => new Error(`Not an address: ${String(input).trim()}`);
+  let scheme = "*";
+  let rest = text;
+  const m = /^([a-z*]+):\/\/(.*)$/.exec(text);
+  if (m) [, scheme, rest] = m;
+  if (!["*", "http", "https"].includes(scheme)) throw new Error("Only http and https addresses can be allowed");
+  // A pasted page address counts as its site: the path, query and fragment go.
+  rest = rest.split(/[/?#]/)[0];
+  if (/[@\s]/.test(rest)) throw bad();
+  const hp = /^(\[[0-9a-f:.]+\]|[^:[\]]+)(?::(\*|\d{1,5}(?:-\d{1,5})?))?$/.exec(rest);
+  if (!hp) throw bad();
+  let host;
+  try {
+    host = new URL(`http://${hp[1]}`).hostname;
+  } catch {
+    throw bad();
+  }
+  let port = hp[2];
+  if (port && port !== "*") {
+    const [lo, hi = lo] = port.split("-").map(Number);
+    if (lo < 1 || hi > 65535) throw new Error("A port is 1 to 65535");
+    if (lo > hi) throw new Error("A range of ports goes from the lower to the higher");
+    if (lo === hi) port = String(lo);
+  }
+  // A scheme with one port, or a scheme alone: an origin (the URL drops a
+  // default port).
+  if (scheme !== "*" && (!port || /^\d+$/.test(port))) return new URL(`${scheme}://${host}${port ? `:${port}` : ""}`).origin;
+  return `${scheme}://${host}:${port || "*"}`;
+}
+
 // Grants say which websites Coddy may act on without asking: always, or for
 // the rest of one chat (until the browser restarts).
 // granted reports whether origin may be acted on for the chat. An "always"
-// covers the chats of the connected server, never a remote one. A host entry
-// leaves out home, the Coddy server itself, under every local name of its
-// port: its web UI approves a chat's own requests, so only an entry naming
-// that very origin lets a chat act there without the person's word.
+// covers the chats of the connected server, never a remote one, and so does
+// grants.all, every website. An entry for every port, and grants.all, leave
+// out home, the Coddy server itself, under every local name of its port: its
+// web UI approves a chat's own requests, so only an entry that names its port
+// lets a chat act there without the person's word.
 export function granted(origin, sessionId, grants, { remote = false, home = "" } = {}) {
   if ((grants.chats[sessionId] || []).includes(origin)) return true;
   if (remote) return false;
   if (grants.always.includes(origin)) return true;
-  return grants.always.some((entry) => covers(entry, origin)) && !sameServer(origin, home);
+  const own = sameServer(origin, home);
+  if (grants.always.some((entry) => covers(entry, origin) && (!own || namesPort(entry)))) return true;
+  return Boolean(grants.all) && !own;
 }
 
 // sameServer says whether origin reaches the server at home: the same origin,

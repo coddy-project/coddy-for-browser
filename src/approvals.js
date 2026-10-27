@@ -34,6 +34,7 @@ export class Approvals {
     const seeded = Boolean(kept.seeded);
     this.grants = {
       always: seeded ? kept.always || [] : [...new Set([...(kept.always || []), ...LOCAL_SITES])],
+      all: Boolean(kept.all),
       chats: session.chats || {},
       remote: session.remote || [],
     };
@@ -44,7 +45,7 @@ export class Approvals {
   // persist writes the grants where each kind lives.
   async persist() {
     if (this.sessionStore === this.store) return this.store.set({ ...this.grants, seeded: true });
-    await this.store.set({ always: this.grants.always, seeded: true });
+    await this.store.set({ always: this.grants.always, all: this.grants.all, seeded: true });
     await this.sessionStore.set({ chats: this.grants.chats, remote: this.grants.remote });
   }
 
@@ -146,6 +147,18 @@ export class Approvals {
     const p = this.pending.get(id);
     if (!p) throw new Error("The question was already answered or expired");
     await p.decide(choice);
+  }
+
+  // addAlways puts an entry on the list of sites allowed always (siteEntry).
+  async addAlways(entry) {
+    this.grants = { ...this.grants, always: [...new Set([...this.grants.always, entry])] };
+    await this.persist();
+  }
+
+  // setAll turns on or off every website for the chats of the server.
+  async setAll(on) {
+    this.grants = { ...this.grants, all: Boolean(on) };
+    await this.persist();
   }
 
   async revoke(origin) {

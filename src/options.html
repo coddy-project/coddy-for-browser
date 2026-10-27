@@ -48,6 +48,25 @@
           addresses are on the list from the start, on any port but your Coddy server's own. A chat from another machine
           asks about every site.
         </p>
+        <label class="check">
+          <input id="all" type="checkbox" />
+          <span>Allow every website without asking</span>
+        </label>
+        <p id="all-note" class="muted" hidden>
+          The chats of your server act on any website without a question. Your Coddy server itself still needs an entry
+          with its port, and a chat from another machine still asks.
+        </p>
+        <form id="add-site" class="row add-site">
+          <input
+            id="site"
+            aria-label="Website to allow"
+            placeholder="https://example.com, localhost:3000, 10.0.0.5:8000-8100 or example.com:*"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button type="submit">Add</button>
+        </form>
+        <p id="site-error" class="error" role="alert" hidden></p>
         <ul id="allowed" class="list"></ul>
       </section>
       <section class="card">

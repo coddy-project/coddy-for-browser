@@ -59,7 +59,10 @@ flowchart TB
   this chat, always allow, or decline. "Always" covers the chats of the home server only: a chat from another
   machine asks for every new website. A page cannot answer these questions for you. Pages on your own machine
   (`localhost`, `127.0.0.1`, `[::1]`, any port) are on the list of sites allowed always from the start, except the
-  Coddy server itself, whose web UI approves the chats' own requests; revoke them there like any other site.
+  Coddy server itself, whose web UI approves the chats' own requests; revoke them there like any other site. The
+  settings page also takes addresses beforehand - an origin (`https://example.com`), a port (`localhost:3000`), a
+  range of ports (`10.0.0.5:8000-8100`) or every port (`example.com:*`) - and a switch that allows every website
+  for the chats of your server; your Coddy server still needs an entry with its own port.
 - **You can stop it.** The Stop button on the page Coddy works in cancels every action, ungroups every tab and takes
   back what the chats from other machines were allowed; the tabs stay open. **Disconnect** on the settings page does
   the same and closes the connection.

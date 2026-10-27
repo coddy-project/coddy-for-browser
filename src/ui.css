@@ -149,6 +149,24 @@ label {
   margin-bottom: 10px;
   font-weight: 500;
 }
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+label.check input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.add-site {
+  flex-wrap: nowrap;
+  margin-bottom: 10px;
+}
+.add-site input {
+  flex: 1;
+  min-width: 0;
+}
 input {
   font: inherit;
   padding: 7px 9px;

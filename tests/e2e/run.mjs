@@ -80,6 +80,20 @@ try {
   await options.locator("#status").getByText("Connected", { exact: true }).waitFor({ timeout: 15000 });
   await coddy.state.ready;
   assert.equal(coddy.state.hello.browser.name, "Chrome - e2e");
+
+  // Sites allowed beforehand: an address with a range of ports goes on the
+  // list, a scheme other than http(s) is refused under the field, and the
+  // switch for every website shows its note.
+  await options.locator("#site").fill("example.com:1000-2000");
+  await options.getByRole("button", { name: "Add" }).click();
+  await options.locator('#allowed span[title="*://example.com:1000-2000"]').getByText("example.com, ports 1000-2000").waitFor();
+  await options.locator("#site").fill("ftp://example.com");
+  await options.getByRole("button", { name: "Add" }).click();
+  await options.locator("#site-error").getByText("Only http and https addresses can be allowed").waitFor();
+  await options.locator("#all").check();
+  await options.locator("#all-note").waitFor();
+  await options.locator("#all").uncheck();
+  await options.locator("#all-note").waitFor({ state: "hidden" });
   assert.ok(coddy.state.hello.actions.includes("open_tab"));
   assert.deepEqual(coddy.state.tabs, []);
   await capture(options, "options-connected", [1280, 390]);

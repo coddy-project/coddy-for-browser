@@ -88,7 +88,7 @@ test("the local entries start on the list once, and a revoked one stays revoked"
   const store = memoryStore();
   const a = new Approvals({ store, sessionStore: memoryStore(), home: () => "http://127.0.0.1:12345" });
   await a.load();
-  assert.deepEqual(store.peek(), { always: LOCAL_SITES, seeded: true });
+  assert.deepEqual(store.peek(), { always: LOCAL_SITES, all: false, seeded: true });
   await a.ensure("http://localhost:5173", { id: "s1" }, "click");
   assert.equal(a.list().length, 0);
   // The Coddy server itself asks.
@@ -105,4 +105,19 @@ test("the local entries start on the list once, and a revoked one stays revoked"
   assert.equal(b.list().length, 1);
   b.cancelAll();
   await assert.rejects(asked);
+});
+
+test("addresses added beforehand and every website are kept across restarts", async () => {
+  const store = memoryStore();
+  const a = new Approvals({ store, sessionStore: memoryStore() });
+  await a.load();
+  await a.addAlways("*://example.com:1000-2000");
+  await a.setAll(true);
+  const b = new Approvals({ store, sessionStore: memoryStore() });
+  await b.load();
+  assert.ok(b.grants.always.includes("*://example.com:1000-2000"));
+  assert.equal(b.grants.all, true);
+  await b.ensure("https://example.com:1500", { id: "s1" }, "click");
+  await b.ensure("https://elsewhere.example", { id: "s1" }, "click");
+  assert.equal(b.list().length, 0);
 });
