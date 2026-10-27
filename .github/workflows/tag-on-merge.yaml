@@ -11,6 +11,10 @@
 # released when GitHub lists a merged pull request for its commit; a direct
 # push to main releases nothing.
 #
+# A merge is released only while the repository variable RELEASE_ON_MERGE
+# is true; otherwise the workflow is skipped and the version waits for Run
+# workflow or a tag pushed by hand.
+#
 # workflow_dispatch:
 #   - empty: tag HEAD of main (if it has no tag) and release it
 #   - release_tag set: release that existing tag again, for example once the
@@ -38,6 +42,7 @@ permissions:
 jobs:
   tag:
     name: Prepare the release tag
+    if: github.event_name == 'workflow_dispatch' || vars.RELEASE_ON_MERGE == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

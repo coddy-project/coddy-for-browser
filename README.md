@@ -311,13 +311,14 @@ the store credentials, and they run on `main`. Every action is pinned to a commi
 
 ### Releases
 
-Merging a pull request into `main` releases it. [tag-on-merge.yaml](.github/workflows/tag-on-merge.yaml) tags the merge
-commit with the next version: the patch after the newest `X.Y.Z` tag, or the version of `package.json` when that is
-higher, so a pull request raises the minor or major version by editing `package.json`. Then
-[release.yaml](.github/workflows/release.yaml) builds that version into both manifests, attaches the packages to a
-GitHub release and submits them to the Chrome Web Store and addons.mozilla.org where publishing there is switched on;
-the stores publish the version once their review passes. A direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of
-`main`, or, with a tag given, releases that tag again.
+Merging a pull request into `main` releases it once the repository variable `RELEASE_ON_MERGE` is `true`; until then a
+merge releases nothing. [tag-on-merge.yaml](.github/workflows/tag-on-merge.yaml) tags the merge commit with the next
+version: the patch after the newest `X.Y.Z` tag, or the version of `package.json` when that is higher, so a pull request
+raises the minor or major version by editing `package.json`. Then [release.yaml](.github/workflows/release.yaml) builds
+that version into both manifests, attaches the packages to a GitHub release and submits them to the Chrome Web Store and
+addons.mozilla.org where publishing there is switched on; the stores publish the version once their review passes. A
+direct push to `main` releases nothing. **Run workflow** on *Tag release on merge* tags the head of `main` and releases
+it whatever the variable says, or, with a tag given, releases that tag again.
 
 One job builds the packages, and the GitHub release and each store are jobs of their own that take those packages. A
 job that failed is run again alone (**Re-run failed jobs**, or that job's own re-run), and a store job skips a version
