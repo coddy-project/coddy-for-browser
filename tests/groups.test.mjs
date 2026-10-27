@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Groups, SHARED_TITLE, chatTitle } from "../src/groups.js";
+import { Groups, GROUP_TITLE, GROUP_COLOR, chatTitle } from "../src/groups.js";
 import { fakeChrome, memoryStore } from "./fake-chrome.mjs";
 
 async function setup() {
@@ -18,7 +18,7 @@ test("a shared tab is in the Coddy group and reported without a chat", async () 
   api.addTab("chrome://settings", "Settings");
   await groups.share(tab.id);
   const g = api.groupsById.get(api.tabsById.get(tab.id).groupId);
-  assert.equal(g.title, SHARED_TITLE);
+  assert.equal(g.title, GROUP_TITLE);
   assert.deepEqual(await groups.tabs(), [{ id: tab.id, url: "https://example.com/", title: "Example" }]);
   await assert.rejects(groups.share(api.addTab("chrome://extensions").id), /web pages/);
 });
@@ -31,7 +31,9 @@ test("a chat takes a shared tab into a group of its own, which no other chat rea
   const [listed] = await groups.tabs();
   assert.equal(listed.sessionId, "sess_a");
   const g = api.groupsById.get(api.tabsById.get(tab.id).groupId);
-  assert.equal(g.title, "Fix the docs");
+  assert.equal(g.title, GROUP_TITLE);
+  assert.equal(g.color, GROUP_COLOR);
+  assert.deepEqual(groups.chats(), [{ sessionId: "sess_a", title: "Fix the docs", working: false }]);
   // The shared group emptied and closed, as Chrome's do.
   assert.equal(groups.state.shared, null);
   await assert.rejects(groups.claim(tab.id, { id: "sess_b" }), (e) => e.reason === "other_chat");
@@ -44,12 +46,12 @@ test("a tab a chat opens starts in its group, and release hands its tabs back", 
   const { api, groups } = await setup();
   const tab = await groups.open("https://example.org/", { id: "sess_a" });
   assert.equal(groups.ownerOf(api.tabsById.get(tab.id)), "sess_a");
-  assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, chatTitle({ id: "sess_a" }));
+  assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, GROUP_TITLE);
   const second = await groups.open("https://example.org/2", { id: "sess_a" });
   assert.equal(api.tabsById.get(second.id).groupId, api.tabsById.get(tab.id).groupId);
   assert.equal((await groups.release("sess_a")).length, 2);
   for (const t of await groups.tabs()) assert.equal(t.sessionId, undefined);
-  assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, SHARED_TITLE);
+  assert.equal(api.groupsById.get(api.tabsById.get(tab.id).groupId).title, GROUP_TITLE);
 });
 
 test("the working mark follows the chat's turn", async () => {
@@ -57,9 +59,9 @@ test("the working mark follows the chat's turn", async () => {
   const tab = await groups.open("https://example.org/", { id: "sess_a", title: "Report" });
   const groupId = api.tabsById.get(tab.id).groupId;
   await groups.setWorking({ id: "sess_a" }, true);
-  assert.match(api.groupsById.get(groupId).title, /^⏳ Report$/);
+  assert.equal(api.groupsById.get(groupId).title, "⏳ Coddy");
   await groups.setWorking({ id: "sess_a" }, false);
-  assert.equal(api.groupsById.get(groupId).title, "Report");
+  assert.equal(api.groupsById.get(groupId).title, GROUP_TITLE);
 });
 
 test("Stop ungroups every Coddy tab and forgets the groups", async () => {
@@ -89,10 +91,10 @@ test("groups the user closed are forgotten, and the bookkeeping survives a reloa
 
 test("a long chat title is shortened and a missing one falls back to the id", () => {
   assert.equal(chatTitle({ id: "sess_0123456789", title: "x".repeat(40) }).length, 30);
-  assert.equal(chatTitle({ id: "sess_0123456789" }), "Coddy 456789");
+  assert.equal(chatTitle({ id: "sess_0123456789" }), "456789");
 });
 
-test("a chat of another Coddy keeps its machine in the group's title, however long its own", () => {
+test("a chat of another Coddy keeps its machine next to its title, however long its own", () => {
   const title = chatTitle({ id: "laptop/sess_1", title: "x".repeat(40), node: "laptop" });
   assert.ok(title.endsWith(" (laptop)"), title);
   assert.ok(title.length <= 30, title);

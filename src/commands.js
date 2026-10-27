@@ -28,7 +28,7 @@ export const ACTIONS = [
 export const MAX_FILE_BYTES = 32 * 1024 * 1024;
 
 // chatOf reads the chat a command is for. A chat of another Coddy process
-// names its node; its tab group carries the node next to the title
+// names its node; the side panel shows the node next to the chat's title
 // (groups.chatTitle), so the user sees where the chat working in a tab runs.
 export function chatOf(raw) {
   const id = String(raw?.id || "");

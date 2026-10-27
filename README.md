@@ -53,8 +53,9 @@ flowchart TB
   chat asks you in the extension, naming the machine it runs on.
 - **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its tab groups of the browser. You share a tab
   with every chat by pressing **Share** in the side panel, or by dragging it into the **Coddy** group. A chat that
-  works in a shared tab moves it into a group of its own, titled after the chat, and no other chat may act there. A
-  tab Coddy opens starts in the chat's group. Drag a tab out of a group, or press **Take back**, to take it back.
+  works in a shared tab moves it into a group of its own, and no other chat may act there. A tab Coddy opens starts
+  in the chat's group. Every one of these groups is titled **Coddy** and coloured purple, and the side panel names
+  the chat that holds the tab in front of you. Drag a tab out of a group, or press **Take back**, to take it back.
 - **You approve websites.** Before the first action on a website, a small window of the extension asks: allow for
   this chat, always allow, or decline. "Always" covers the chats of the home server only: a chat from another
   machine asks for every new website. A page cannot answer these questions for you. Pages on your own machine

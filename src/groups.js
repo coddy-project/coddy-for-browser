@@ -1,35 +1,29 @@
 // Tabs Coddy may reach live in the browser's tab groups (Chrome, Yandex
 // Browser, Firefox 139 and later), so the user sees them in the tab strip and
 // moves them by dragging:
-// - the shared "Coddy" group holds the tabs the user shares; any chat may
-//   take one;
-// - every chat that works in the browser has a group of its own, titled after
-//   the chat, holding the tabs it took or opened; no other chat may act there.
+// - the shared group holds the tabs the user shares; any chat may take one;
+// - every chat that works in the browser has a group of its own, holding the
+//   tabs it took or opened; no other chat may act there.
+// Every one of them is titled "Coddy" in Coddy's lilac, so its tabs are told
+// apart from the rest at a glance; a chat's group gets an hourglass while the
+// chat acts, and the side panel names the chat that holds a tab.
 // Group ids last as long as the browser runs, so the bookkeeping lives in
 // session storage and survives the service worker being torn down.
 
 import { isWebPage } from "./policy.js";
 
-export const SHARED_TITLE = "Coddy";
-const SHARED_COLOR = "purple";
-const PALETTE = ["blue", "cyan", "green", "orange", "pink", "red", "yellow"];
+export const GROUP_TITLE = "Coddy";
+export const GROUP_COLOR = "purple";
 const WORKING = "⏳ ";
 const NONE = -1;
 
-export function colorFor(sessionId) {
-  let h = 0;
-  for (const ch of String(sessionId)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[h % PALETTE.length];
-}
-
-// chatTitle names a chat's group: its title cut to fit the tab strip, and
-// for a chat of another Coddy the machine it runs on, which is never cut off.
+// chatTitle names a chat in the side panel: its title cut to fit, and for a
+// chat of another Coddy the machine it runs on, which is never cut off.
 export function chatTitle(session) {
   const node = session?.node ? ` (${String(session.node).slice(0, 20)})` : "";
   const room = 30 - node.length;
-  const title = String(session?.title || "").trim();
-  if (title) return (title.length > room ? title.slice(0, room - 1) + "…" : title) + node;
-  return "Coddy " + String(session?.id || "").slice(-6) + node;
+  const title = String(session?.title || "").trim() || String(session?.id || "").slice(-6);
+  return (title.length > room ? title.slice(0, room - 1) + "…" : title) + node;
 }
 
 export class Groups {
@@ -131,7 +125,7 @@ export class Groups {
       }
     }
     const groupId = await this.api.tabs.group({ tabIds: [tabId], createProperties: { windowId } });
-    await this.api.tabGroups.update(groupId, { title: SHARED_TITLE, color: SHARED_COLOR });
+    await this.api.tabGroups.update(groupId, { title: GROUP_TITLE, color: GROUP_COLOR });
     this.state.shared = groupId;
     await this.save();
     return groupId;
@@ -170,9 +164,8 @@ export class Groups {
       }
     }
     const groupId = await this.api.tabs.group({ tabIds: [tab.id], createProperties: { windowId: tab.windowId } });
-    const title = chatTitle(session);
-    this.state.chats[session.id] = { groupId, title };
-    await this.api.tabGroups.update(groupId, { title: this.decorate(session.id, title), color: colorFor(session.id) });
+    this.state.chats[session.id] = { groupId, title: chatTitle(session) };
+    await this.api.tabGroups.update(groupId, { title: this.decorate(session.id), color: GROUP_COLOR });
     await this.save();
     return groupId;
   }
@@ -267,8 +260,8 @@ export class Groups {
     if (managed.length) await this.api.tabs.ungroup(managed);
   }
 
-  decorate(sessionId, title) {
-    return (this.working.has(sessionId) ? WORKING : "") + title;
+  decorate(sessionId) {
+    return (this.working.has(sessionId) ? WORKING : "") + GROUP_TITLE;
   }
 
   async retitle(session) {
@@ -276,7 +269,7 @@ export class Groups {
     if (!chat) return;
     if (session.title) chat.title = chatTitle(session);
     try {
-      await this.api.tabGroups.update(chat.groupId, { title: this.decorate(session.id, chat.title) });
+      await this.api.tabGroups.update(chat.groupId, { title: this.decorate(session.id) });
     } catch {}
   }
 
