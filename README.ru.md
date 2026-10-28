@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  <b>Установить для <a href="https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni">Chrome и Яндекс Браузера</a> · <a href="https://addons.mozilla.org/firefox/addon/coddy-for-browser/">Firefox и Firefox для Android</a></b>
+</p>
+
+<p align="center">
   <a href="README.md">English</a> · <b>Русский</b>
 </p>
 
@@ -81,7 +85,7 @@ API отладчика у расширений Firefox нет, поэтому т
    Ключ не короче 32 символов сгенерируйте командой `openssl rand -hex 32` и положите в `<home>/.env` как
    `CODDY_BROWSER_KEY`. Запускайте `coddy serve` на машине с браузером. Серверу на другой машине нужен HTTPS, потому
    что простой HTTP расширение принимает только для `localhost`, `127.0.0.1` и `[::1]`;
-2. **[установите](#установка) расширение** из последнего релиза;
+2. **[установите](#установка) расширение** из магазина вашего браузера;
 3. **[подключитесь](#подключение).** На странице настроек, которая открывается после установки, введите адрес
    веб-интерфейса сервера (`http://127.0.0.1:12345` для локального сервера), ключ и имя этого браузера и нажмите
    **Save and connect**;
@@ -93,6 +97,30 @@ API отладчика у расширений Firefox нет, поэтому т
 браузеру через релей.
 
 ## Установка
+
+| Браузер | Откуда установить |
+| --- | --- |
+| Chrome, Яндекс Браузер и совместимые браузеры на Chromium | [Chrome Web Store](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni) |
+| Firefox и Firefox для Android | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/) |
+
+Firefox на компьютере и на Android используют одну страницу дополнения и один пакет. Установка с AMO доступна после
+того, как Mozilla опубликует совместимую версию. Нужен Firefox для Android 142 или новее. Откройте ссылку Firefox
+Add-ons в Firefox на том устройстве, куда хотите поставить расширение.
+
+### Обновления
+
+Если автоматические обновления включены, браузер обновляет расширение из своего магазина, когда там выходит новая
+версия. Релиз на GitHub может появиться раньше, чем магазины закончат проверку. Браузер получает версию из магазина,
+а не ZIP из релиза GitHub. Механизм описан в документации
+[Chrome](https://developer.chrome.com/docs/extensions/develop/concepts/extensions-update-lifecycle) и
+[Firefox](https://extensionworkshop.com/documentation/manage/updating-your-extension/) (на английском).
+
+Chrome может отложить установку скачанного обновления, пока открыта боковая панель или соединение с Coddy. Если
+обновление ждёт, перезапустите Chrome. Распакованные сборки для Chromium и временные дополнения Firefox не получают
+обновления из магазинов. Замените распакованные файлы и перезагрузите расширение либо вручную загрузите новый архив
+Firefox.
+
+### Пакеты для ручной установки
 
 Пакеты прикреплены к каждому [релизу](https://github.com/coddy-project/coddy-for-browser/releases), а сам релиз
 уходит ещё в Chrome Web Store и на addons.mozilla.org, которые публикуют его после своей проверки. Ссылки на страницы
@@ -108,11 +136,17 @@ GitHub, - тот же пакет, что и в релизе (чтобы скач
 
 ### Chrome
 
+Установите расширение из [Chrome Web Store](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni).
+Для разработки или ручной установки выполните следующие шаги.
+
 1. Распакуйте `coddy-for-browser-chrome-<version>.zip` в папку, которую не удалите.
 2. Откройте `chrome://extensions`, включите **Режим разработчика** и нажмите **Загрузить распакованное расширение**,
    затем выберите эту папку.
 
 ### Яндекс Браузер
+
+Установите расширение с той же [страницы Chrome Web Store](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni).
+Для разработки или ручной установки выполните следующие шаги.
 
 1. Распакуйте `coddy-for-browser-chrome-<version>.zip` в папку, которую не удалите.
 2. Откройте `browser://extensions`, включите **Режим разработчика** и нажмите **Загрузить распакованное расширение**,
@@ -122,7 +156,8 @@ GitHub, - тот же пакет, что и в релизе (чтобы скач
 
 ### Firefox
 
-- **С addons.mozilla.org**, когда версия там опубликована. Устанавливается как любое другое дополнение;
+- **С [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)**, когда версия там опубликована.
+  Устанавливается как любое другое дополнение, обновляется через Firefox;
 - **без подписи** (`.zip`). Обычный Firefox ставит только дополнения, подписанные Mozilla. Откройте
   `about:debugging#/runtime/this-firefox`, нажмите **Загрузить временное дополнение** и выберите архив. Временное
   дополнение Firefox удаляет при закрытии. Firefox Developer Edition и Nightly оставляют архив без подписи
@@ -135,7 +170,9 @@ GitHub, - тот же пакет, что и в релизе (чтобы скач
 
 ### Firefox для Android
 
-- **С addons.mozilla.org**, когда версия там опубликована, через пункт **Дополнения** в меню браузера;
+- **С [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)**, когда совместимая версия там
+  опубликована. Откройте ту же страницу в Firefox для Android и установите дополнение либо найдите его через пункт
+  **Расширения** в меню браузера;
 - **без подписи**, для разработки. Обычный Firefox для Android ставит дополнения только с addons.mozilla.org, а
   `web-ext` устанавливает сборку на телефон или эмулятор через `adb`. На телефоне для этого нужна отладка по USB, а
   в настройках Firefox удалённая отладка.

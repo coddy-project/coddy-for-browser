@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  <b>Install for <a href="https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni">Chrome and Yandex Browser</a> · <a href="https://addons.mozilla.org/firefox/addon/coddy-for-browser/">Firefox and Firefox for Android</a></b>
+</p>
+
+<p align="center">
   <b>English</b> · <a href="README.ru.md">Русский</a>
 </p>
 
@@ -78,7 +82,7 @@ the web UI and the questions about websites open in tabs.
    Generate the key, at least 32 characters, with `openssl rand -hex 32` and keep it in `<home>/.env` as
    `CODDY_BROWSER_KEY`. Run `coddy serve` on the machine of the browser. A server on another machine needs HTTPS: the
    extension uses plain HTTP only for `localhost`, `127.0.0.1` and `[::1]`.
-2. **[Install](#install) the extension** from the latest release.
+2. **[Install](#install) the extension** from the store for your browser.
 3. **[Connect](#connect).** On the settings page that opens after the install, enter the address of the server's web
    UI (`http://127.0.0.1:12345` for a local server), the key and a name for this browser, and press **Save and
    connect**.
@@ -90,6 +94,29 @@ A machine reachable only through your swarm joins it with `swarm.join`, and the 
 the relay.
 
 ## Install
+
+| Browser | Install from |
+| --- | --- |
+| Chrome, Yandex Browser and compatible Chromium browsers | [Chrome Web Store](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni) |
+| Firefox and Firefox for Android | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/) |
+
+Firefox on desktop and Android uses the same listing and package. Installation from AMO becomes available once
+Mozilla publishes a compatible version; Firefox for Android needs version 142 or newer. Open the Firefox Add-ons
+link in Firefox on the device where you want to install it.
+
+### Updates
+
+With automatic updates enabled, your browser updates an extension installed from its store when a newer version
+is published there. A GitHub release can appear before the stores finish reviewing it. The browser uses the store's
+version, not the ZIP attached to the GitHub release. See the update guides for
+[Chrome](https://developer.chrome.com/docs/extensions/develop/concepts/extensions-update-lifecycle) and
+[Firefox](https://extensionworkshop.com/documentation/manage/updating-your-extension/).
+
+Chrome can defer installing a downloaded update while the side panel or the connection to Coddy is open. Restart
+Chrome if an update is waiting. Unpacked Chromium builds and temporary Firefox add-ons do not receive store updates;
+replace the unpacked files and reload the extension, or load the new Firefox archive manually.
+
+### Packages for manual installation
 
 Every [release](https://github.com/coddy-project/coddy-for-browser/releases) carries the packages and goes to the
 Chrome Web Store and addons.mozilla.org as well, which publish it once their review passes; its notes link the
@@ -104,10 +131,16 @@ archive GitHub hands out is the same package as the release's (downloading an ar
 
 ### Chrome
 
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni).
+For development or a manual installation:
+
 1. Unpack `coddy-for-browser-chrome-<version>.zip` into a folder you keep.
 2. Open `chrome://extensions`, turn on **Developer mode** and press **Load unpacked**. Choose the unpacked folder.
 
 ### Yandex Browser
+
+Install from the same [Chrome Web Store listing](https://chromewebstore.google.com/detail/coddy-for-browser/pdppgelbaehcedjpgfonemkmglpjifni).
+For development or a manual installation:
 
 1. Unpack `coddy-for-browser-chrome-<version>.zip` into a folder you keep.
 2. Open `browser://extensions`, turn on **Developer mode** and press **Load unpacked**. Choose the unpacked folder.
@@ -116,7 +149,8 @@ The toolbar button opens the web UI in a window of its own, placed at the right 
 
 ### Firefox
 
-- **From addons.mozilla.org**, once the version is published there: like any add-on.
+- **From [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)**, once the version is
+  published there: like any add-on, with updates through Firefox.
 - **Unsigned** (`.zip`): release Firefox installs only add-ons Mozilla signed. Open
   `about:debugging#/runtime/this-firefox`, press **Load Temporary Add-on** and choose the archive; Firefox removes a
   temporary add-on when it closes. Firefox Developer Edition and Nightly keep the unsigned archive installed from
@@ -128,7 +162,9 @@ The toolbar button opens the web UI in Firefox's sidebar.
 
 ### Firefox for Android
 
-- **From addons.mozilla.org**, once the version is published there: **Add-ons** in the browser's menu.
+- **From [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/coddy-for-browser/)**, once a compatible version
+  is published there: open this same listing in Firefox for Android and install it, or use **Extensions** in the
+  browser's menu.
 - **Unsigned**, for development: release Firefox for Android installs add-ons from addons.mozilla.org only, and
   `web-ext` installs the build on a phone or an emulator over `adb`, with USB debugging on the phone and remote
   debugging in Firefox's settings:

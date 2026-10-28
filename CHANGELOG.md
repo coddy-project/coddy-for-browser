@@ -4,6 +4,16 @@ Every version that reaches people has a section here, under its number: the rele
 changed" and addons.mozilla.org as the version's release notes. A pull request that changes the extension adds its
 lines under the version it raises `package.json` to.
 
+## 0.1.3
+
+- Both READMEs link to the Chrome Web Store and Firefox Add-ons, with store installation as the default. Firefox
+  on desktop and Android uses the same listing and package; Android requires a compatible version published on AMO.
+- Installation instructions distinguish browser-managed store updates from manual updates of unpacked builds and
+  temporary add-ons, and explain why Chrome may wait until a restart to install an update.
+- The READMEs include fresh screenshots, a quick start and troubleshooting; developer instructions live in
+  CONTRIBUTING.md and CONTRIBUTING.ru.md.
+- The Chrome Web Store reviewers have test instructions for trying the extension without a Coddy server.
+
 ## 0.1.2
 
 The first version for the stores since 0.1.0; 0.1.1 was a release on GitHub of the same extension.
