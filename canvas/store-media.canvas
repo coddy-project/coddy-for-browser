@@ -1,0 +1,25 @@
+{
+	"nodes":[
+		{
+			"id":"a01a82da4e4862e1",
+			"type":"file",
+			"file":"docs/store-media/index.html",
+			"coddy":{"title":"Coddy store screenshots and promotional images","added_by":"agent"},
+			"x":0,
+			"y":0,
+			"width":1280,
+			"height":800
+		},
+		{
+			"id":"1ac5a31e6cd807bf",
+			"type":"file",
+			"file":"docs/store-media/index.html",
+			"coddy":{"title":"Store media - phone preview","added_by":"agent"},
+			"x":1360,
+			"y":0,
+			"width":390,
+			"height":844
+		}
+	],
+	"edges":[]
+}
