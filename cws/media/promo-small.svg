@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280" viewBox="0 0 440 280" role="img" aria-label="Coddy for Browser promotional artwork">
+<defs>
+  <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#100d1a"/><stop offset="0.52" stop-color="#1d1035"/><stop offset="1" stop-color="#0d0b15"/></linearGradient>
+  <radialGradient id="ambient"><stop stop-color="#8735e8" stop-opacity=".42"/><stop offset="1" stop-color="#8735e8" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="440" height="280" fill="url(#background)"/>
+<ellipse cx="220" cy="120" rx="200" ry="150" fill="url(#ambient)"/>
+<svg x="158" y="46" width="124" height="124" viewBox="0 0 64 64"><defs>
+    <linearGradient id="plate" x1="10" y1="8" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#211d2b"/>
+      <stop offset="1" stop-color="#101014"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="12" y1="12" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5f3ff"/>
+      <stop offset="0.5" stop-color="#ddd6fe"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="18" y1="18" x2="46" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c4b5fd" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#9333ea" stop-opacity="0.6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="58%">
+      <stop offset="0" stop-color="#9333ea" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#9333ea" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g transform="translate(32 32)">
+    <rect x="-24" y="-24" width="48" height="48" rx="11" fill="url(#plate)"/>
+    <rect x="-24" y="-24" width="48" height="48" rx="11" fill="url(#glow)"/>
+    <rect x="-23.5" y="-23.5" width="47" height="47" rx="10.5" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <g transform="rotate(90)">
+      <circle r="12" fill="none" stroke="url(#stroke)" stroke-width="4.2" stroke-linecap="round" stroke-dasharray="56.93 18.47" stroke-dashoffset="9.25"/>
+      <circle r="6.6" fill="none" stroke="url(#inner)" stroke-width="2.6"/>
+    </g>
+  </g>
+</svg>
+<path aria-label="Coddy" fill="#f4efff" transform="translate(135 209) scale(1 -1)" d="M 32.160 1.920 Q 29.670 0.630 26.977 -0.022 Q 24.285 -0.682 21.352 -0.682 Q 12.607 -0.682 7.500 4.207 Q 2.393 9.098 2.393 17.460 Q 2.393 25.852 7.500 30.735 Q 12.607 35.625 21.352 35.625 Q 24.285 35.625 26.977 34.965 Q 29.670 34.312 32.160 33.023 L 32.160 25.785 Q 29.647 27.495 27.210 28.290 Q 24.773 29.085 22.080 29.085 Q 17.250 29.085 14.482 25.988 Q 11.723 22.898 11.723 17.460 Q 11.723 12.045 14.482 8.947 Q 17.250 5.857 22.080 5.857 Q 24.773 5.857 27.210 6.652 Q 29.647 7.455 32.160 9.165 L 32.160 1.920 Z M 51.749 20.880 Q 48.959 20.880 47.497 18.877 Q 46.034 16.875 46.034 13.102 Q 46.034 9.330 47.497 7.320 Q 48.959 5.317 51.749 5.317 Q 54.494 5.317 55.942 7.320 Q 57.397 9.330 57.397 13.102 Q 57.397 16.875 55.942 18.877 Q 54.494 20.880 51.749 20.880 Z M 51.749 26.880 Q 58.522 26.880 62.332 23.220 Q 66.142 19.567 66.142 13.102 Q 66.142 6.630 62.332 2.970 Q 58.522 -0.682 51.749 -0.682 Q 44.954 -0.682 41.122 2.970 Q 37.289 6.630 37.289 13.102 Q 37.289 19.567 41.122 23.220 Q 44.954 26.880 51.749 26.880 Z M 90.096 22.410 L 90.096 36.472 L 98.533 36.472 L 98.533 0.000 L 90.096 0.000 L 90.096 3.795 Q 88.363 1.478 86.271 0.397 Q 84.186 -0.682 81.448 -0.682 Q 76.596 -0.682 73.476 3.172 Q 70.363 7.035 70.363 13.102 Q 70.363 19.170 73.476 23.025 Q 76.596 26.880 81.448 26.880 Q 84.163 26.880 86.263 25.793 Q 88.363 24.705 90.096 22.410 Z M 84.561 5.415 Q 87.261 5.415 88.678 7.380 Q 90.096 9.352 90.096 13.102 Q 90.096 16.852 88.678 18.817 Q 87.261 20.790 84.561 20.790 Q 81.891 20.790 80.473 18.817 Q 79.056 16.852 79.056 13.102 Q 79.056 9.352 80.473 7.380 Q 81.891 5.415 84.561 5.415 Z M 124.455 22.410 L 124.455 36.472 L 132.892 36.472 L 132.892 0.000 L 124.455 0.000 L 124.455 3.795 Q 122.722 1.478 120.630 0.397 Q 118.545 -0.682 115.807 -0.682 Q 110.955 -0.682 107.835 3.172 Q 104.722 7.035 104.722 13.102 Q 104.722 19.170 107.835 23.025 Q 110.955 26.880 115.807 26.880 Q 118.522 26.880 120.623 25.793 Q 122.722 24.705 124.455 22.410 Z M 118.920 5.415 Q 121.620 5.415 123.037 7.380 Q 124.455 9.352 124.455 13.102 Q 124.455 16.852 123.037 18.817 Q 121.620 20.790 118.920 20.790 Q 116.250 20.790 114.832 18.817 Q 113.415 16.852 113.415 13.102 Q 113.415 9.352 114.832 7.380 Q 116.250 5.415 118.920 5.415 Z M 137.507 26.250 L 145.899 26.250 L 152.957 8.438 L 158.957 26.250 L 167.342 26.250 L 156.302 -2.482 Q 154.644 -6.870 152.424 -8.610 Q 150.212 -10.357 146.582 -10.357 L 141.729 -10.357 L 141.729 -4.853 L 144.354 -4.853 Q 146.484 -4.853 147.452 -4.170 Q 148.427 -3.495 148.967 -1.732 L 149.207 -1.005 L 137.507 26.250 Z"/>
+<rect x="1" y="1" width="438" height="278" fill="none" stroke="#bca2f5" stroke-opacity=".19" stroke-width="2"/>
+</svg>
