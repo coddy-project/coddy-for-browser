@@ -50,7 +50,7 @@ export async function launchChromium(chromium, extension, { env = process.env, a
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const context = browser.contexts()[0];
   console.log(`loaded the extension ${id} into ${executable}`);
-  return { context, close: () => close(context, child, profile, browser) };
+  return { context, id, close: () => close(context, child, profile, browser) };
 }
 
 // loadUnpacked sends Extensions.loadUnpacked over the browser's pipe: one

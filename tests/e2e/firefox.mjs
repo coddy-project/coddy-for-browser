@@ -4,7 +4,8 @@
 // site approval window, open_tab, read the page, act on it through the page
 // (Firefox has no debugger API), a screenshot through tabs.captureTab, files
 // both ways, the side panel's web UI signed in by its ticket with a turn from
-// the person's tab, a chat of another Coddy asking first, Disconnect.
+// the person's tab, the interface scale reaching the open panel, a chat of
+// another Coddy asking first, Disconnect.
 //
 //   npm run build
 //   npm i --no-save puppeteer-core   # once; or NODE_PATH pointing at one
@@ -210,11 +211,71 @@ try {
   const mineTab = coddy.state.turn.tab.tab_id;
   await waitFor("the person's tab in the chat's group", () => coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "sess_panel_1"));
 
+  // The interface scale of the settings page reaches the open panel at once:
+  // the strip and the web UI grow, the frame stays where it was and is not
+  // loaded again. The select is set from the page itself, as Disconnect is
+  // pressed below.
+  const chooseScale = (value) =>
+    options.evaluate((v) => {
+      const select = document.querySelector("#scale");
+      select.value = v;
+      select.dispatchEvent(new Event("change"));
+    }, value);
+  const panelLayout = () =>
+    panel.evaluate(() => {
+      const frame = document.getElementById("webui").getBoundingClientRect();
+      return {
+        strip: document.querySelector(".panel-bar").getBoundingClientRect().height,
+        frame: { left: frame.left, right: Math.round(frame.right), bottom: Math.round(frame.bottom) },
+        width: innerWidth,
+        height: innerHeight,
+        scrolls: document.documentElement.scrollHeight > innerHeight,
+      };
+    });
+  const frameFits = (width, factor) =>
+    coddy.state.frame && Math.abs(coddy.state.frame.width - width / factor) <= 1 && Math.abs(coddy.state.frame.scale - factor) < 0.01;
+  const before = await panelLayout();
+  assert.equal(await options.$eval("#scale", (e) => e.value), "100");
+  await waitFor("the web UI at the browser's own size", () => frameFits(before.width, 1));
+  await chooseScale("150");
+  await waitFor("the web UI at 150%", () => frameFits(before.width, 1.5));
+  await waitFor("the strip at 150%", async () => Math.abs((await panelLayout()).strip - before.strip * 1.5) <= 2);
+  const scaled = await panelLayout();
+  assert.deepEqual(scaled.frame, { left: 0, right: scaled.width, bottom: scaled.height }, "the frame still fills the panel");
+  assert.equal(scaled.scrolls, false);
+  assert.equal(coddy.state.signins, 1, "the web UI was not loaded again");
+  assert.equal(await options.evaluate(async () => (await browser.storage.local.get("settings")).settings.scale), 150);
+  await chooseScale("100");
+  await waitFor("the web UI back at the browser's own size", () => frameFits(before.width, 1));
+  await waitFor("the strip back at the browser's own size", async () => Math.abs((await panelLayout()).strip - before.strip) <= 1);
+
   // A chat of another Coddy asks first, in the panel.
   const laptop = { id: "laptop/sess_trip", title: "Trip", node: "laptop" };
   const remote = coddy.command("open_tab", { params: { url: coddy.base + "/fixture?remote" }, session: laptop });
   remote.catch(() => {}); // refused before the assertion below takes it
   await panel.locator("::-p-text(A chat of another Coddy asks to use this browser)").wait();
+  // A question taller than the panel scrolls, so its last button, the refusal,
+  // can be reached at any scale. Firefox 150 and later refuse to resize a
+  // privileged page over BiDi, so the panel is made small from within.
+  await chooseScale("200");
+  await panel.waitForFunction(() => document.documentElement.style.getPropertyValue("--scale") === "2");
+  await panel.evaluate(() => {
+    document.body.style.width = "420px";
+    document.body.style.height = "400px";
+  });
+  const declineBottom = () => panel.evaluate(() => document.querySelector("#approvals button.reject").getBoundingClientRect().bottom);
+  assert.ok((await declineBottom()) > 400, "the question is taller than the panel");
+  await panel.evaluate(() => {
+    const questions = document.querySelector("#approvals");
+    questions.scrollTop = questions.scrollHeight;
+  });
+  assert.ok((await declineBottom()) <= 400, "Decline in view");
+  await panel.evaluate(() => {
+    document.body.style.width = "";
+    document.body.style.height = "";
+  });
+  await chooseScale("100");
+  await panel.waitForFunction(() => document.documentElement.style.getPropertyValue("--scale") === "1");
   await panel.locator("::-p-text(Decline)").click();
   await assert.rejects(remote, (e) => e.data?.reason === "chat_declined");
 
@@ -227,7 +288,7 @@ try {
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, the extension's own tab groups over Firefox's tabs, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, Disconnect");
+  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, the extension's own tab groups over Firefox's tabs, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, the interface scale, a chat of another Coddy asking first, Disconnect");
 } catch (e) {
   console.error(e);
   process.exitCode = 1;

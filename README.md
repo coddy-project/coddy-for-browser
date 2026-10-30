@@ -51,6 +51,8 @@ the actions and asks you before Coddy touches a new website.
   you.
 - **Clicks, typing and files.** Keys, hovering, scrolling, dragging, screenshots and files both ways as well. In
   Chrome and Yandex Browser the input goes through the debugger, so pages trust it like a person's.
+- **A size of your own.** **Interface scale** on the settings page makes the panel, the web UI in it and the questions
+  larger or smaller, from 50% to 200%.
 - **A Stop button on the page.** It cancels every action and ungroups every tab; the tabs stay open.
 
 ## Browsers
@@ -358,6 +360,23 @@ A chat of another Coddy process asks first, naming the machine it runs on:
   </picture>
 </p>
 
+### The size of the interface
+
+**Interface scale** under **Appearance** on the settings page sets how large the extension draws the side panel, the
+web UI in it, the windows with questions and the settings page itself, from 50% to 200%. An open panel takes a new
+value within a second and keeps the chat as it is. The web UI lays out for the room that leaves it: a panel 420 px wide
+gives it 280 px at 150% and 560 px at 75%.
+
+The size on screen is **Interface scale** times the size the browser gives the extension's pages, so at 100% the
+extension adds nothing. What decides that size differs between browsers:
+
+| Browser | What else changes the size |
+| --- | --- |
+| Chrome | The display's scale in the operating system, **Page zoom** in `chrome://settings/appearance`, and the zoom of the settings page: the browser takes the panel and the settings page for one site, so Ctrl and plus on the settings page enlarges the panel too, and Ctrl and 0 there brings it back. |
+| Yandex Browser | The display's scale and the zoom of the settings page, as in Chrome. |
+| Firefox | The display's scale. The zoom of a tab does not reach the sidebar, even on the settings page. |
+| Firefox for Android | The font size and the display size in Android's settings. |
+
 ## Safety and privacy
 
 - **Tab groups decide what Coddy reaches.** Coddy sees only the tabs in its tab groups of the browser. You share a tab
@@ -391,7 +410,7 @@ A chat of another Coddy process asks first, naming the machine it runs on:
 | `tabs`, `tabGroups` | Read the tabs in the Coddy groups, open and group tabs for a chat. Firefox has tab groups from version 139; Firefox for Android has none, and the extension keeps the groups itself. |
 | `scripting` | Read a page and resolve element references; show the working indicator. |
 | `debugger` | Chrome and Yandex Browser: trusted clicks, typing and keys, and screenshots through the DevTools protocol. The browser shows a bar while it is attached; the extension detaches 20 s after the last action. Firefox has no such API. |
-| `storage` | The connection settings and the websites you allowed. The key is readable only by the extension's own pages. |
+| `storage` | The connection settings, the interface scale and the websites you allowed. The key is readable only by the extension's own pages. |
 | `alarms` | Wake the service worker to reconnect after Chrome stopped it; Firefox keeps its background page running. |
 | `notifications` | Tell you that Coddy asks to use a website. |
 | `sidePanel` | Chrome: the web UI beside the page. Firefox takes a sidebar from the manifest instead, Yandex Browser opens a window, and Firefox for Android a tab. |
@@ -525,6 +544,10 @@ extension, so the extension asks for it again at the next action there.
 
 **On a phone, Coddy in Termux stops when the screen goes off.** Android stopped Termux. Let Termux run unrestricted in the
 battery settings and start the server after `termux-wake-lock`.
+
+**The side panel is too small or too large.** Set **Interface scale** on the settings page. In Chrome and Yandex
+Browser the panel also follows the zoom of the settings page, so if it changed size by itself, press Ctrl and 0 there.
+[The size of the interface](#the-size-of-the-interface) lists what else decides it.
 
 ## Contributing
 

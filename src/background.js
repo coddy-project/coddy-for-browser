@@ -14,6 +14,7 @@ import { api, action, capabilities } from "./platform.js";
 import { hasAccess } from "./access.js";
 import { withVirtualGroups } from "./virtualgroups.js";
 import { serverURL, checkKey, checkName, isWebPage, siteEntry } from "./policy.js";
+import { DEFAULT_SCALE, checkScale, scaleOf } from "./scale.js";
 
 const version = api.runtime.getManifest().version;
 const caps = capabilities(api);
@@ -29,7 +30,7 @@ function storeOf(area, key) {
   };
 }
 
-let settings = { address: "", key: "", name: "", id: "", enabled: false };
+let settings = { address: "", key: "", name: "", id: "", enabled: false, scale: DEFAULT_SCALE };
 // The grant names the current selection. Stop replaces it, so a command
 // Coddy sent before the Stop is refused whenever it arrives.
 let grant = crypto.randomUUID();
@@ -244,6 +245,7 @@ async function state(msg = {}) {
       name: settings.name,
       enabled: settings.enabled,
       keySet: !!settings.key,
+      scale: scaleOf(settings.scale),
     },
     status: connection.status,
     server: connection.connected() ? connection.server : null,
@@ -314,6 +316,10 @@ const handlers = {
   },
   async setAllowAll({ on }) {
     await approvals.setAll(on);
+  },
+  async setScale({ scale }) {
+    settings = { ...settings, scale: checkScale(scale) };
+    await api.storage.local.set({ settings });
   },
 };
 

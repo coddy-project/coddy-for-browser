@@ -2,6 +2,7 @@ import { api } from "./platform.js";
 import { request, el, showError, statusClass } from "./ui.js";
 import { EVERY_SITE, requestAccess } from "./access.js";
 import { accessPatterns, serverURL, siteEntry } from "./policy.js";
+import { SCALES, applyScale } from "./scale.js";
 
 // trashIcon is the glyph of a row's Revoke button, built with DOM calls
 // rather than markup, which the add-on stores' review flags.
@@ -42,6 +43,8 @@ async function refresh() {
   }
   $("status").textContent = s.status;
   $("status").className = "status " + statusClass(s.status);
+  applyScale(document.documentElement, s.settings.scale);
+  $("scale").value = String(s.settings.scale);
   if (!filled) {
     $("address").value = s.settings.address || "http://127.0.0.1:12345";
     $("name").value = s.settings.name || "";
@@ -117,6 +120,11 @@ $("add-site").onsubmit = async (event) => {
 };
 $("disconnect").onclick = () =>
   request({ type: "disconnect" })
+    .then(refresh)
+    .catch(showError);
+$("scale").replaceChildren(...SCALES.map((scale) => el("option", { value: String(scale) }, `${scale}%`)));
+$("scale").onchange = () =>
+  request({ type: "setScale", scale: Number($("scale").value) })
     .then(refresh)
     .catch(showError);
 

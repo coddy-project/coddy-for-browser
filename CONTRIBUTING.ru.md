@@ -111,6 +111,7 @@ Secrets and variables, Actions или `gh variable set AMO_PUBLISH --body true`)
 | `src/virtualgroups.js` | Группы вкладок, которые расширение ведёт само там, где их нет у браузера (Firefox для Android). |
 | `src/approvals.js`, `src/policy.js` | Одобрение сайтов и проверка адресов. |
 | `src/access.js` | Доступ к сайтам со стороны самого браузера, который запрашивается в том же клике, что разрешает сайт, и проверяется перед действием. |
+| `src/scale.js` | Масштаб интерфейса со страницы настроек: список значений, их проверка и переменная, по которой масштабирует `src/ui.css`. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | Что выполняется на странице, ввод через протокол DevTools (Chrome) или через страницу (Firefox), индикатор работы. |
 | `scripts/build.mjs` | Сборка для каждого семейства браузеров (манифест Firefox - Manifest V2). |
 | `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | Версия следующего релиза, загрузка в Chrome Web Store и отправка на addons.mozilla.org. |

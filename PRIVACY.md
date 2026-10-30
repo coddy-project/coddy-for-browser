@@ -1,6 +1,6 @@
 # Privacy policy of Coddy for Browser
 
-Last updated: 27 October 2026.
+Last updated: 30 October 2026.
 
 Coddy for Browser is a browser extension that connects your browser to a Coddy agent server you run yourself
 (`coddy serve`). This policy describes what the extension handles and where it goes.
@@ -25,8 +25,8 @@ configured with, like any other tool result. Your Coddy's configuration and its 
 ## What stays on your device
 
 The extension keeps its settings in the browser's extension storage: the server address, the key the server issued,
-the browser's name, the websites you allow always, and which tab group belongs to which chat. Removing the extension
-removes them.
+the browser's name, the interface scale, the websites you allow always, and which tab group belongs to which chat.
+Removing the extension removes them.
 
 ## What the extension does not do
 

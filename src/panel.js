@@ -11,6 +11,7 @@ import { api } from "./platform.js";
 import { request, el, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
 import { frameURL, homeSession, listen, openChat } from "./frame.js";
+import { applyScale } from "./scale.js";
 
 const $ = (id) => document.getElementById(id);
 // The worker counts open panels: a website question shows here instead of a
@@ -86,6 +87,7 @@ async function refresh() {
     showError(e);
     return;
   }
+  applyScale(document.documentElement, state.settings.scale);
   if (loaded && (!state.settings.enabled || loaded !== state.settings.address)) unload();
   const offline = state.status !== "Connected";
   $("offline").hidden = !offline;

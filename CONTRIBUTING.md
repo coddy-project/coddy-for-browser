@@ -110,6 +110,7 @@ one-time setup; until it is done, its job prints what is missing and the release
 | `src/virtualgroups.js` | Tab groups the extension keeps itself where the browser has none (Firefox for Android). |
 | `src/approvals.js`, `src/policy.js` | Website approvals and address checks. |
 | `src/access.js` | The browser's own grant of websites: asked for in the click that allows one, checked before an action. |
+| `src/scale.js` | The interface scale of the settings page: the scales on offer, their check and the variable `src/ui.css` zooms by. |
 | `src/page.js`, `src/input.js`, `src/pageinput.js`, `src/indicator.js` | What runs in a page, input through the DevTools protocol (Chrome) or through the page (Firefox), the working indicator. |
 | `scripts/build.mjs` | The build of each browser family (the Firefox manifest is Manifest V2). |
 | `scripts/next-version.mjs`, `scripts/publish-chrome.mjs`, `scripts/sign.mjs` | The version of the next release, the upload to the Chrome Web Store and the submission to addons.mozilla.org. |
