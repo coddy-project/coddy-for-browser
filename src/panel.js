@@ -2,7 +2,8 @@
 // to, in a frame, under a strip of the extension's own - the tab you look at
 // with Share and Take back, and the settings. Opened on a tab a chat of the
 // server holds, the web UI shows that chat, its turn live; the chat's name in
-// the strip opens it again later. The connection and Disconnect
+// the strip opens it again later, and so does coming to the tab when the
+// setting asks for it. The connection and Disconnect
 // are on the settings page, Stop on the page Coddy works in. A turn sent from the web UI
 // takes the tab you look at into its chat's tab group first. The same page is
 // Chrome's side panel, Firefox's sidebar and, in Yandex Browser, a window of
@@ -10,7 +11,7 @@
 import { api } from "./platform.js";
 import { request, el, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
-import { frameURL, homeSession, listen, openChat } from "./frame.js";
+import { chatToFollow, frameURL, homeSession, listen, openChat } from "./frame.js";
 import { applyScale } from "./scale.js";
 
 const $ = (id) => document.getElementById(id);
@@ -22,6 +23,7 @@ let state = null;
 let rendered = "";
 let loaded = "";
 let origin = "";
+let lastTab;
 
 function tabbar(s) {
   const bar = $("tabbar");
@@ -92,7 +94,10 @@ async function refresh() {
   const offline = state.status !== "Connected";
   $("offline").hidden = !offline;
   $("offline-text").textContent = state.settings.enabled ? `Coddy: ${state.status}` : "Connect the extension to your Coddy server.";
+  const chat = state.settings.followTab ? chatToFollow(lastTab, state.current) : "";
+  lastTab = state.current?.id;
   if (!offline && !loaded) await load(state.current?.owner);
+  else if (chat) openChat($("webui").contentWindow, origin, chat);
   tabbar(state);
   const next = JSON.stringify(state.pending);
   if (next !== rendered) {
@@ -127,3 +132,4 @@ $("settings").onclick = $("open-settings").onclick = () => api.runtime.openOptio
 windowId = Number(new URLSearchParams(location.search).get("window")) || (await api.windows?.getCurrent())?.id;
 await refresh();
 setInterval(refresh, 1000);
+api.tabs.onActivated.addListener(() => void refresh());

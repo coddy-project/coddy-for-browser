@@ -18,7 +18,8 @@ const body = (req) =>
   });
 
 // WEB_UI is the part of Coddy's web UI the side panel relies on, in the same
-// messages: the sign-in by the ticket, the theme, the tab of a turn.
+// messages: the sign-in by the ticket, the theme, the tab of a turn, the chat
+// the panel asks it to show.
 const WEB_UI = `<!doctype html><title>Coddy</title>
 <style>body{margin:0;padding:16px;background:#0f0f10;color:#fff;font:14px system-ui}textarea{display:block;width:100%;height:60px}</style>
 <p id="who">Signing in</p>
@@ -34,6 +35,13 @@ fetch("/mock/signin", { method: "POST", body: q.get("coddy_panel") || "" })
 parent.postMessage({ source: "coddy-web-ui", type: "theme", theme: {
   scheme: "dark", bg: "rgb(15, 15, 16)", surface: "rgba(14, 14, 18, 0.62)", border: "rgba(255, 255, 255, 0.12)",
   text: "rgb(255, 255, 255)", muted: "rgb(156, 163, 175)", accent: "rgb(147, 51, 234)" } }, origin);
+// The chat is in the address, as in the real web UI, so asking for the chat on
+// show changes nothing.
+addEventListener("message", (ev) => {
+  const m = ev.data;
+  if (ev.source === parent && ev.origin === origin && m?.source === "coddy-for-browser" && m.type === "open") location.hash = "#/s/" + m.sessionId;
+});
+addEventListener("hashchange", () => fetch("/mock/shown", { method: "POST", body: location.hash.slice("#/s/".length) }));
 let n = 0;
 // A run that cannot reach into the frame (Firefox over BiDi) hands it the
 // next message through the server and reads the answer back from it.
@@ -150,6 +158,7 @@ export async function startMockCoddy({ key }) {
     files: new Map(),
     tickets: new Set(),
     signins: 0,
+    shown: [],
     nextID: 1,
     ready: null,
   };
@@ -209,6 +218,12 @@ export async function startMockCoddy({ key }) {
     if (url.pathname === "/mock/answer" && req.method === "POST") {
       return body(req).then((a) => {
         state.answer = a.toString();
+        res.writeHead(204).end();
+      });
+    }
+    if (url.pathname === "/mock/shown" && req.method === "POST") {
+      return body(req).then((sessionId) => {
+        state.shown.push(sessionId.toString());
         res.writeHead(204).end();
       });
     }

@@ -30,7 +30,7 @@ function storeOf(area, key) {
   };
 }
 
-let settings = { address: "", key: "", name: "", id: "", enabled: false, scale: DEFAULT_SCALE };
+let settings = { address: "", key: "", name: "", id: "", enabled: false, scale: DEFAULT_SCALE, followTab: false };
 // The grant names the current selection. Stop replaces it, so a command
 // Coddy sent before the Stop is refused whenever it arrives.
 let grant = crypto.randomUUID();
@@ -246,6 +246,7 @@ async function state(msg = {}) {
       enabled: settings.enabled,
       keySet: !!settings.key,
       scale: scaleOf(settings.scale),
+      followTab: settings.followTab === true,
     },
     status: connection.status,
     server: connection.connected() ? connection.server : null,
@@ -319,6 +320,10 @@ const handlers = {
   },
   async setScale({ scale }) {
     settings = { ...settings, scale: checkScale(scale) };
+    await api.storage.local.set({ settings });
+  },
+  async setFollowTab({ on }) {
+    settings = { ...settings, followTab: on === true };
     await api.storage.local.set({ settings });
   },
 };

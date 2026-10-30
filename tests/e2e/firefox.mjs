@@ -211,6 +211,29 @@ try {
   const mineTab = coddy.state.turn.tab.tab_id;
   await waitFor("the person's tab in the chat's group", () => coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "sess_panel_1"));
 
+  // Coming to a tab shows its chat in the web UI once the person turns the
+  // setting on. Firefox 150 and later refuse to bring a privileged page to the
+  // front over BiDi, and the panel has to come back there, so the extension
+  // itself changes the tab, and the switch is pressed from the settings page.
+  const activate = (tabId) => options.evaluate((id) => browser.tabs.update(id, { active: true }).then(() => {}), tabId);
+  const pressFollow = (on) =>
+    options.evaluate(() => document.querySelector("#follow").click()).then(() => options.waitForSelector(`#follow[aria-checked="${on}"]`));
+  const shown = (...ids) => waitFor(`the web UI to show ${ids.join(", ")}`, () => coddy.state.shown.join() === ids.join());
+  await options.waitForSelector('#follow[aria-checked="false"]');
+  await activate(opened.tabId);
+  await panel.waitForFunction(() => document.querySelector("#tabbar button.chat")?.textContent === 'in "E2E chat"');
+  assert.deepEqual(coddy.state.shown, [], "the chat stays while the setting is off");
+  await pressFollow(true);
+  assert.equal(await options.evaluate(async () => (await browser.storage.local.get("settings")).settings.followTab), true);
+  await activate(mineTab);
+  await shown("sess_panel_1");
+  await activate(opened.tabId);
+  await shown("sess_panel_1", "sess_e2e");
+  assert.equal(coddy.state.signins, 1, "the web UI was not loaded again");
+  await pressFollow(false);
+  await activate(mineTab);
+  await panel.evaluate(async () => browser.tabs.update((await browser.tabs.getCurrent()).id, { active: true }).then(() => {}));
+
   // The interface scale of the settings page reaches the open panel at once:
   // the strip and the web UI grow, the frame stays where it was and is not
   // loaded again. The select is set from the page itself, as Disconnect is
@@ -288,7 +311,7 @@ try {
   await waitFor("no tab shared", () => coddy.state.tabs.length === 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, the extension's own tab groups over Firefox's tabs, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, the interface scale, a chat of another Coddy asking first, Disconnect");
+  console.log("PASS (Firefox): connect, sites allowed beforehand and every website, the extension's own tab groups over Firefox's tabs, site approval, open_tab, snapshot, click, type, press, hover through the page, screenshot through captureTab, upload, download, scroll, side panel web UI signed in by its ticket with a turn from the person's tab, the chat of the tab in front, the interface scale, a chat of another Coddy asking first, Disconnect");
 } catch (e) {
   console.error(e);
   process.exitCode = 1;

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { frameURL, homeSession, listen, openChat, themeOf, PANEL_SOURCE, WEBUI_SOURCE } from "../src/frame.js";
+import { chatToFollow, frameURL, homeSession, listen, openChat, themeOf, PANEL_SOURCE, WEBUI_SOURCE } from "../src/frame.js";
 
 const theme = {
   scheme: "dark",
@@ -73,4 +73,21 @@ test("the panel opens the web UI on a chat of its server, and asks it to show on
   assert.ok(!openChat(frame, "http://127.0.0.1:12345", "laptop/sess_1"));
   assert.ok(!openChat(frame, "", "sess_0a1b"));
   assert.equal(posted.length, 1);
+});
+
+test("coming to a tab of a chat of the server names that chat", () => {
+  assert.equal(chatToFollow(1, { id: 2, owner: "sess_b" }), "sess_b");
+  // Back from a page that is not a web page, which has no tab to compare.
+  assert.equal(chatToFollow(undefined, { id: 2, owner: "sess_b" }), "sess_b");
+});
+
+test("staying on a tab names no chat, even when a chat takes that tab", () => {
+  assert.equal(chatToFollow(2, { id: 2, owner: "sess_b" }), "");
+});
+
+test("a tab no chat of the server holds leaves the panel's chat where it is", () => {
+  assert.equal(chatToFollow(1, { id: 2, owner: "" }), "", "a shared tab");
+  assert.equal(chatToFollow(1, { id: 2, owner: null }), "", "a tab outside the groups");
+  assert.equal(chatToFollow(1, { id: 2, owner: "laptop/sess_1" }), "", "a chat of another Coddy");
+  assert.equal(chatToFollow(1, null), "", "a page that is not a web page");
 });

@@ -2,8 +2,8 @@
 // server: connect, open a tab with the site approval, read and act on the
 // page, files both ways, another chat refused, turnEnded, the side panel's
 // web UI signed in by its ticket and a turn sent from it with the person's
-// tab, the interface scale reaching the open panel, a chat of another Coddy
-// asking first, Disconnect on the settings page.
+// tab, the chat of the tab in front, the interface scale reaching the open
+// panel, a chat of another Coddy asking first, Disconnect on the settings page.
 //
 //   npm run build
 //   npm i --no-save playwright   # once; or NODE_PATH pointing at one
@@ -257,6 +257,46 @@ try {
     coddy.state.tabs.find((t) => t.id === mineTab && t.sessionId === "sess_panel_1"),
   );
   await panel.locator("#tabbar").getByText('in "Read this page"').waitFor();
+
+  // The chat of the tab in front: its name in the strip shows it, and coming to
+  // the tab does once the person turns the setting on. A chat already on show
+  // is no change of the web UI's address, and the frame is not loaded again.
+  const strip = panel.locator("#tabbar");
+  const follow = options.getByRole("switch", { name: "Show the chat of the active tab" });
+  const switched = (on) => waitFor(`the setting ${on}`, async () => (await follow.getAttribute("aria-checked")) === String(on));
+  const shown = (...ids) => waitFor(`the web UI to show ${ids.join(", ")}`, () => coddy.state.shown.join() === ids.join());
+  await strip.getByRole("button", { name: 'in "Read this page"' }).click();
+  await shown("sess_panel_1");
+  await switched(false);
+  await page.bringToFront();
+  await strip.getByRole("button", { name: 'in "E2E chat"' }).waitFor();
+  assert.deepEqual(coddy.state.shown, ["sess_panel_1"], "the chat stays while the setting is off");
+  await follow.click();
+  await switched(true);
+  assert.equal(await options.evaluate(async () => (await chrome.storage.local.get("settings")).settings.followTab), true);
+  assert.deepEqual(coddy.state.shown, ["sess_panel_1"], "turning the setting on moves nothing");
+  await mine.bringToFront();
+  await strip.getByRole("button", { name: 'in "Read this page"' }).waitFor();
+  await page.bringToFront();
+  await shown("sess_panel_1", "sess_e2e");
+  await mine.bringToFront();
+  await shown("sess_panel_1", "sess_e2e", "sess_panel_1");
+  await page.bringToFront();
+  await shown("sess_panel_1", "sess_e2e", "sess_panel_1", "sess_e2e");
+  // A new tab and a page outside the groups leave the chat where it is.
+  const blank = await context.newPage();
+  await strip.getByText("Coddy works with ordinary web pages only.").waitFor();
+  await blank.goto(coddy.base + "/fixture?blank");
+  await strip.getByText("taken when you send").waitFor();
+  assert.equal(coddy.state.shown.at(-1), "sess_e2e");
+  assert.equal(coddy.state.signins, 1, "the web UI was not loaded again");
+  await follow.click();
+  await switched(false);
+  await blank.close();
+  await mine.bringToFront();
+  await panel.bringToFront();
+  await strip.getByRole("button", { name: 'in "Read this page"' }).waitFor();
+
   // Take back ungroups the tab; Share puts it in the shared group.
   await panel.locator("#tabbar").getByRole("button", { name: "Take back" }).click();
   await waitFor("the tab out of every group", () => !coddy.state.tabs.find((t) => t.id === mineTab));
@@ -391,7 +431,7 @@ try {
   assert.equal(await options.locator('#allowed span[title="*://example.com:1000-2000"]').count(), 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, the interface scale, a chat of another Coddy asking first, release, Disconnect, nothing allowed before Chrome's own prompt");
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, the chat of the tab in front, the interface scale, a chat of another Coddy asking first, release, Disconnect, nothing allowed before Chrome's own prompt");
 } finally {
   await close();
   await coddy.close();

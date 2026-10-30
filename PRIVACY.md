@@ -25,8 +25,8 @@ configured with, like any other tool result. Your Coddy's configuration and its 
 ## What stays on your device
 
 The extension keeps its settings in the browser's extension storage: the server address, the key the server issued,
-the browser's name, the interface scale, the websites you allow always, and which tab group belongs to which chat.
-Removing the extension removes them.
+the browser's name, the interface scale, whether the side panel follows the active tab, the websites you allow always,
+and which tab group belongs to which chat. Removing the extension removes them.
 
 ## What the extension does not do
 
