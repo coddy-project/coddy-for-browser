@@ -4,6 +4,15 @@ Every version that reaches people has a section here, under its number: the rele
 changed" and addons.mozilla.org as the version's release notes. A pull request that changes the extension adds its
 lines under the version it raises `package.json` to.
 
+## 0.1.5
+
+- The settings page has a **Side panel** card with **Show the chat of the active tab**, off by default. With it on,
+  coming to a tab a chat of your server works in shows that chat in the panel. You turn it on yourself because the web
+  UI clears a message you have not sent when the chat changes.
+- The strip of the side panel shows the tab you come to at once instead of within a second.
+- Both READMEs say how to install the extension in ungoogled-chromium, which does not install extensions through the
+  interface of the Chrome Web Store.
+
 ## 0.1.4
 
 - The settings page has an **Interface scale**, from 50% to 200%, for the side panel, the web UI in it, the windows with

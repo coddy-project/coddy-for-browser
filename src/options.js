@@ -45,6 +45,7 @@ async function refresh() {
   $("status").className = "status " + statusClass(s.status);
   applyScale(document.documentElement, s.settings.scale);
   $("scale").value = String(s.settings.scale);
+  $("follow").setAttribute("aria-checked", String(s.settings.followTab));
   if (!filled) {
     $("address").value = s.settings.address || "http://127.0.0.1:12345";
     $("name").value = s.settings.name || "";
@@ -125,6 +126,10 @@ $("disconnect").onclick = () =>
 $("scale").replaceChildren(...SCALES.map((scale) => el("option", { value: String(scale) }, `${scale}%`)));
 $("scale").onchange = () =>
   request({ type: "setScale", scale: Number($("scale").value) })
+    .then(refresh)
+    .catch(showError);
+$("follow").onclick = () =>
+  request({ type: "setFollowTab", on: $("follow").getAttribute("aria-checked") !== "true" })
     .then(refresh)
     .catch(showError);
 

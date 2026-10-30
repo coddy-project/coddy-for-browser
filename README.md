@@ -106,6 +106,10 @@ Firefox on desktop and Android uses the same listing and package. Installation f
 Mozilla publishes a compatible version; Firefox for Android needs version 142 or newer. Open the Firefox Add-ons
 link in Firefox on the device where you want to install it.
 
+ungoogled-chromium does not install extensions through the interface of the Chrome Web Store. Load the package by hand,
+as under [Chrome](#chrome), and update it the same way; [its FAQ](https://ungoogled-software.github.io/ungoogled-chromium-wiki/faq)
+describes other ways.
+
 ### Updates
 
 With automatic updates enabled, your browser updates an extension installed from its store when a newer version
@@ -311,6 +315,12 @@ it is, with **Share** and **Take back**, and the settings button, in the web UI'
 
 Open the panel on a tab a chat of your server works in, and the panel shows that chat: a turn started from the
 console, an editor or a scheduled job streams there as in any chat. The chat's name in the strip opens it again.
+
+To have the panel follow you, turn on **Show the chat of the active tab** in the **Side panel** card of the settings
+page. Coming to a tab a chat of your server works in then shows that chat, without loading the panel again. A shared
+tab and a tab outside the groups leave the chat where it is, so a page you opened still goes to the chat on show when
+you write. A chat of another Coddy cannot be shown there, so its tab changes nothing either. The switch is off by
+default, because the web UI clears a message you have not sent when the chat changes.
 
 From any other chat of Coddy, share a tab or let Coddy open one, and ask:
 

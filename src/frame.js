@@ -35,6 +35,16 @@ export function openChat(frameWindow, webUIOrigin, sessionId) {
   return true;
 }
 
+// chatToFollow is the chat the panel shows when the person comes to another
+// tab, if the setting asks for that: the chat of the server that holds the tab.
+// A chat taking the tab in front of the person moves nothing, and neither does
+// a tab no such chat holds, so a page they opened can still go to the chat on
+// show when they write.
+export function chatToFollow(previousTabId, current) {
+  if (!current || current.id === previousTabId) return "";
+  return homeSession(current.owner);
+}
+
 // COLOUR is the only form a theme colour is taken in: what a browser's
 // getComputedStyle answers, rgb() or rgba(), or color(srgb ...) for a colour
 // written with color-mix(). Only numbers fit, so nothing but a colour reaches
