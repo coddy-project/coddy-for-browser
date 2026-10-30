@@ -255,10 +255,14 @@ try {
   remote.catch(() => {}); // refused before the assertion below takes it
   await panel.locator("::-p-text(A chat of another Coddy asks to use this browser)").wait();
   // A question taller than the panel scrolls, so its last button, the refusal,
-  // can be reached at any scale.
+  // can be reached at any scale. Firefox 150 and later refuse to resize a
+  // privileged page over BiDi, so the panel is made small from within.
   await chooseScale("200");
   await panel.waitForFunction(() => document.documentElement.style.getPropertyValue("--scale") === "2");
-  await panel.setViewport({ width: 420, height: 400 });
+  await panel.evaluate(() => {
+    document.body.style.width = "420px";
+    document.body.style.height = "400px";
+  });
   const declineBottom = () => panel.evaluate(() => document.querySelector("#approvals button.reject").getBoundingClientRect().bottom);
   assert.ok((await declineBottom()) > 400, "the question is taller than the panel");
   await panel.evaluate(() => {
@@ -266,7 +270,10 @@ try {
     questions.scrollTop = questions.scrollHeight;
   });
   assert.ok((await declineBottom()) <= 400, "Decline in view");
-  await panel.setViewport({ width: 800, height: 600 });
+  await panel.evaluate(() => {
+    document.body.style.width = "";
+    document.body.style.height = "";
+  });
   await chooseScale("100");
   await panel.waitForFunction(() => document.documentElement.style.getPropertyValue("--scale") === "1");
   await panel.locator("::-p-text(Decline)").click();
