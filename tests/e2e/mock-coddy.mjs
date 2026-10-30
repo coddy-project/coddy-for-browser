@@ -38,7 +38,7 @@ let n = 0;
 // A run that cannot reach into the frame (Firefox over BiDi) hands it the
 // next message through the server and reads the answer back from it.
 setInterval(async () => {
-  const next = await (await fetch("/mock/next")).text();
+  const next = await (await fetch("/mock/next?width=" + innerWidth + "&scale=" + devicePixelRatio)).text();
   if (!next) return;
   document.getElementById("composer").value = next;
   document.getElementById("send").click();
@@ -200,6 +200,8 @@ export async function startMockCoddy({ key }) {
       return res.end(WEB_UI);
     }
     if (url.pathname === "/mock/next") {
+      // How the frame is laid out, which a run over BiDi cannot read from it.
+      state.frame = { width: Number(url.searchParams.get("width")), scale: Number(url.searchParams.get("scale")) };
       const next = state.next || "";
       state.next = "";
       return res.writeHead(200).end(next);

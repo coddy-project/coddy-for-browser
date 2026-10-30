@@ -4,6 +4,15 @@ Every version that reaches people has a section here, under its number: the rele
 changed" and addons.mozilla.org as the version's release notes. A pull request that changes the extension adds its
 lines under the version it raises `package.json` to.
 
+## 0.1.4
+
+- The settings page has an **Interface scale**, from 50% to 200%, for the side panel, the web UI in it, the windows with
+  questions and the settings page itself. An open panel takes a new value within a second and keeps the chat open.
+- A question taller than the side panel scrolls, so its Decline button can always be reached, and **Share** stays in
+  the strip of a narrow panel.
+- Both READMEs explain what else decides the size of the panel in each browser. In Chrome and Yandex Browser the panel
+  follows the zoom of the settings page, and in Firefox for Android the font size and the display size of Android.
+
 ## 0.1.3
 
 - Both READMEs link to the Chrome Web Store and Firefox Add-ons, with store installation as the default. Firefox

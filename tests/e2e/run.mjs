@@ -2,7 +2,8 @@
 // server: connect, open a tab with the site approval, read and act on the
 // page, files both ways, another chat refused, turnEnded, the side panel's
 // web UI signed in by its ticket and a turn sent from it with the person's
-// tab, a chat of another Coddy asking first, Disconnect on the settings page.
+// tab, the interface scale reaching the open panel, a chat of another Coddy
+// asking first, Disconnect on the settings page.
 //
 //   npm run build
 //   npm i --no-save playwright   # once; or NODE_PATH pointing at one
@@ -63,7 +64,7 @@ const buttonLook = (page) =>
 const tinted = { tint: true, text: true, quietDecline: true };
 
 const coddy = await startMockCoddy({ key });
-const { context, close } = await launchChromium(chromium, extension);
+const { context, id: extensionId, close } = await launchChromium(chromium, extension);
 const errors = [];
 const capture = async (page, name, widths = [1280], { fit = true } = {}) => {
   if (!shots) return;
@@ -84,7 +85,10 @@ const capture = async (page, name, widths = [1280], { fit = true } = {}) => {
 };
 
 try {
-  const worker = context.serviceWorkers()[0] || (await context.waitForEvent("serviceworker"));
+  // A branded browser runs service workers of its own extensions as well.
+  const worker = await waitFor("the extension's service worker", () =>
+    context.serviceWorkers().find((w) => !extensionId || w.url().startsWith(`chrome-extension://${extensionId}/`)),
+  );
   // Node gives a chrome-extension: URL no origin of its own.
   const origin = worker.url().split("/").slice(0, 3).join("/");
   // The first install opens the settings page by itself; a launch that
@@ -222,6 +226,27 @@ try {
   );
   await panel.locator("#tabbar").getByText("taken when you send").waitFor();
   await capture(panel, "panel-webui", [420], { fit: false });
+  // However large the scale, Share stays clear of the settings button: the
+  // title gives way first, then the note beside it.
+  const stripAtScale = (factor) =>
+    waitFor(`the strip at ${factor}`, () => panel.evaluate((f) => document.documentElement.style.getPropertyValue("--scale") === f, String(factor)));
+  const share = panel.locator("#tabbar").getByRole("button", { name: "Share" });
+  const onTop = () =>
+    share.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === b;
+    });
+  await panel.setViewportSize({ width: 260, height: 720 });
+  const whole = await panel.locator("#tabbar small").evaluate((n) => n.scrollWidth <= n.clientWidth);
+  assert.equal(whole, true, "at 100% the title gives way before the note");
+  assert.equal(await onTop(), true);
+  await options.locator("#scale").selectOption("200");
+  await stripAtScale(2);
+  await panel.setViewportSize({ width: 320, height: 720 });
+  assert.equal(await onTop(), true, "Share at 200% in a narrow panel");
+  await panel.setViewportSize({ width: 420, height: 720 });
+  await options.locator("#scale").selectOption("100");
+  await stripAtScale(1);
   await webUI.locator("#composer").fill("Read this page");
   await webUI.getByRole("button", { name: "Send" }).click();
   await webUI.getByText("The page is Coddy fixture.").waitFor();
@@ -239,6 +264,69 @@ try {
   await waitFor("the tab in the shared group", () => coddy.state.tabs.find((t) => t.id === mineTab && !t.sessionId));
   await panel.locator("#tabbar").getByText("shared").waitFor();
 
+  // The interface scale of the settings page reaches the open panel at once:
+  // the strip and the web UI grow, the frame stays where it was and is not
+  // loaded again, and a click lands where the web UI is drawn.
+  const panelLayout = () =>
+    panel.evaluate(() => {
+      const frame = document.getElementById("webui").getBoundingClientRect();
+      return {
+        strip: document.querySelector(".panel-bar").getBoundingClientRect().height,
+        frame: { left: frame.left, right: frame.right, bottom: frame.bottom },
+        width: innerWidth,
+        height: innerHeight,
+        scrolls: document.documentElement.scrollHeight > innerHeight,
+      };
+    });
+  const frameFits = (width, factor) =>
+    coddy.state.frame && Math.abs(coddy.state.frame.width - width / factor) <= 1 && Math.abs(coddy.state.frame.scale - factor) < 0.01;
+  const before = await panelLayout();
+  assert.equal(await options.locator("#scale").inputValue(), "100");
+  assert.deepEqual(await options.locator("#scale option").allTextContents(), ["50%", "67%", "75%", "80%", "90%", "100%", "110%", "125%", "150%", "175%", "200%"]);
+  await waitFor("the web UI at the browser's own size", () => frameFits(before.width, 1));
+  await options.locator("#scale").selectOption("150");
+  await waitFor("the web UI at 150%", () => frameFits(before.width, 1.5));
+  await waitFor("the strip at 150%", async () => Math.abs((await panelLayout()).strip - before.strip * 1.5) <= 2);
+  const scaled = await panelLayout();
+  assert.deepEqual(scaled.frame, { left: 0, right: scaled.width, bottom: scaled.height }, "the frame still fills the panel");
+  assert.equal(scaled.scrolls, false);
+  assert.equal(coddy.state.signins, 1, "the web UI was not loaded again");
+  await panel.locator("#tabbar").getByText("shared").waitFor();
+  // A real click and real keys, past Playwright's own hit test, which a zoomed
+  // frame from another process confuses.
+  const composer = await webUI.locator("#composer").evaluate((e) => {
+    const r = e.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  const frameTop = await panel.evaluate(() => document.getElementById("webui").getBoundingClientRect().top);
+  await webUI.locator("#composer").fill("");
+  await panel.bringToFront();
+  await panel.mouse.click(composer.x * 1.5, frameTop + composer.y * 1.5);
+  await panel.keyboard.type("At 150%");
+  assert.equal(await webUI.locator("#composer").inputValue(), "At 150%");
+  await capture(panel, "panel-scaled", [420], { fit: false });
+  // The settings page takes the scale too, and the scale outlives the page.
+  const heading = () => options.evaluate(() => document.querySelector("h1").getBoundingClientRect().height);
+  const larger = await heading();
+  await options.reload();
+  await options.locator("#status").getByText("Connected", { exact: true }).waitFor({ timeout: 15000 });
+  await waitFor("the scale on the page loaded again", async () => (await options.locator("#scale").inputValue()) === "150");
+  await waitFor("the page at 150%", async () => (await heading()) === larger);
+  const stored = await options.evaluate(async () => (await chrome.storage.local.get("settings")).settings.scale);
+  assert.equal(stored, 150);
+  // A value off the list is refused, whoever sends it.
+  const refused = await options.evaluate(() => chrome.runtime.sendMessage({ type: "setScale", scale: 33 }));
+  assert.match(refused.error, /Choose a scale/);
+  // Below 100% the web UI gets more room than the panel has on screen.
+  await options.locator("#scale").selectOption("50");
+  await waitFor("the web UI at 50%", () => frameFits(before.width, 0.5));
+  await options.locator("#scale").selectOption("100");
+  await waitFor("the web UI back at the browser's own size", () => frameFits(before.width, 1));
+  await waitFor("the strip back at the browser's own size", async () => Math.abs((await panelLayout()).strip - before.strip) <= 1);
+  assert.ok((await heading()) < larger);
+  assert.equal(coddy.state.signins, 1, "the web UI was not loaded again");
+  await webUI.locator("#composer").fill("");
+
   // A chat of another Coddy asks first, in the panel, and the site it
   // reaches asks again for it: "always" covers only the server's own chats.
   const laptop = { id: "laptop/sess_trip", title: "Trip", node: "laptop" };
@@ -248,6 +336,19 @@ try {
   await capture(panel, "panel-remote-chat", [420], { fit: false });
   // In the panel the colours are the web UI's own theme.
   assert.deepEqual(await buttonLook(panel), tinted);
+  // A question taller than the panel scrolls, so its last button, the refusal,
+  // can be reached at any scale.
+  await options.locator("#scale").selectOption("200");
+  await stripAtScale(2);
+  await panel.setViewportSize({ width: 420, height: 400 });
+  const declineBottom = () => panel.getByRole("button", { name: "Decline" }).evaluate((b) => b.getBoundingClientRect().bottom);
+  assert.ok((await declineBottom()) > 400, "the question is taller than the panel");
+  await panel.mouse.move(210, 200);
+  await panel.mouse.wheel(0, 2000);
+  await waitFor("Decline in view", async () => (await declineBottom()) <= 400);
+  await panel.setViewportSize({ width: 420, height: 720 });
+  await options.locator("#scale").selectOption("100");
+  await stripAtScale(1);
   await panel.getByRole("button", { name: "Allow for this chat" }).click();
   await panel.getByText("Coddy asks to use a website").waitFor();
   assert.equal(await panel.getByRole("button", { name: "Always allow" }).count(), 0);
@@ -290,7 +391,7 @@ try {
   assert.equal(await options.locator('#allowed span[title="*://example.com:1000-2000"]').count(), 0);
 
   assert.deepEqual(errors, []);
-  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, a chat of another Coddy asking first, release, Disconnect, nothing allowed before Chrome's own prompt");
+  console.log("PASS: connect, site approval, open_tab, snapshot, click, type, press, hover, screenshot, upload, download, scroll, other chat refused, turnEnded, side panel web UI signed in by its ticket with a turn from the person's tab, the interface scale, a chat of another Coddy asking first, release, Disconnect, nothing allowed before Chrome's own prompt");
 } finally {
   await close();
   await coddy.close();

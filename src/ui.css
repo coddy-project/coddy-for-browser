@@ -32,6 +32,19 @@
 [hidden] {
   display: none !important;
 }
+/* The interface scale of the settings page (scale.js). The panel takes it part
+   by part: on its root, zoom would multiply the 100vh the panel fills. The frame
+   stays the size of its place and the web UI in it lays out for the space that
+   leaves, as under the browser's own zoom. */
+body.options,
+body.approval,
+body.panel > .bar,
+body.panel > .error,
+.stage > .card,
+.stage > #approvals,
+#webui {
+  zoom: var(--scale, 1);
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -248,13 +261,17 @@ button.icon.remove:hover {
   border-color: transparent;
   background: transparent;
 }
-input {
+input,
+select {
   font: inherit;
   padding: 7px 9px;
   border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
+}
+select {
+  justify-self: start;
 }
 button {
   font: inherit;
@@ -272,7 +289,8 @@ button:hover {
   border-color: color-mix(in srgb, var(--text) 35%, var(--border));
 }
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -389,9 +407,19 @@ button.icon svg {
   min-width: 0;
   font-weight: 500;
 }
+/* Beside a note, the title takes only the room the note and Share leave it, and
+   the note gives way only once the title has none, so that neither pushes Share
+   out of the strip. */
+.tab-title:has(+ small) {
+  flex: 1 1 0;
+  max-width: max-content;
+}
 .tabbar small {
   white-space: nowrap;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 button.link {
   border: 0;
@@ -426,11 +454,16 @@ body.panel > .error,
   display: flex;
   flex-direction: column;
 }
+/* A question taller than the panel scrolls: its last button is the refusal. The
+   padding keeps the card's shadow, which a scrolling box would cut at its edge. */
 .stage > #approvals {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 10px 36px;
+  max-height: 100%;
+  overflow-y: auto;
   z-index: 2;
   display: grid;
   gap: 8px;

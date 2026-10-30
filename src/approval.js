@@ -2,6 +2,7 @@
 // panel is open to ask it in. It closes when nothing is left to answer.
 import { request, showError } from "./ui.js";
 import { approvalCard } from "./cards.js";
+import { applyScale } from "./scale.js";
 
 let rendered = "";
 
@@ -13,6 +14,7 @@ async function refresh() {
     showError(e);
     return;
   }
+  applyScale(document.documentElement, s.settings.scale);
   if (!s.pending.length) {
     window.close();
     return;
