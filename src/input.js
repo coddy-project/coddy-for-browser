@@ -129,10 +129,11 @@ export async function cdpAction(dbg, tabId, action, p, expected, guard) {
     const height = Math.round(cssLayoutViewport.clientHeight);
     // p.scale is the page's devicePixelRatio; the clip's scale undoes it.
     const { data } = await send("Page.captureScreenshot", {
-      format: "png",
+      format: "jpeg",
+      quality: 80,
       clip: { x: cssLayoutViewport.pageX, y: cssLayoutViewport.pageY, width, height, scale: 1 / (p.scale || 1) },
     });
-    return { dataUrl: `data:image/png;base64,${data}`, width, height };
+    return { dataUrl: `data:image/jpeg;base64,${data}`, width, height };
   }
   if (action === "click") {
     const button = p.button || "left";

@@ -149,7 +149,7 @@ export function fakeDebugger(frameURL = () => "https://example.com/") {
       sent.push([tabId, method, params]);
       if (method === "Page.getLayoutMetrics")
         return { cssLayoutViewport: { pageX: 0, pageY: 0, clientWidth: 800, clientHeight: 600 } };
-      if (method === "Page.captureScreenshot") return { data: "iVBORw0KGgo=" };
+      if (method === "Page.captureScreenshot") return { data: "/9j/4AAQSkZJRg==" };
       if (method === "Page.getNavigationHistory")
         return {
           currentIndex: 1,

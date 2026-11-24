@@ -17,7 +17,7 @@ export function pageInput(api, script) {
     async screenshot(tabId, view) {
       const tab = await api.tabs.get(tabId).catch(() => null);
       const scale = view?.width && tab?.width ? view.width / tab.width : 1;
-      const dataUrl = await api.tabs.captureTab(tabId, { format: "png", scale });
+      const dataUrl = await api.tabs.captureTab(tabId, { format: "jpeg", quality: 80, scale });
       return { dataUrl, width: view?.width, height: view?.height };
     },
     history: null,
