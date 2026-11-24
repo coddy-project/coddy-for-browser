@@ -19,17 +19,11 @@ export function isWebPage(address) {
   }
 }
 
-const loopback = ["localhost", "127.0.0.1", "[::1]"];
-
-// serverURL is the address of the Coddy server as the user typed it,
-// checked: plain HTTP only on this machine, so the key and the pages never
-// cross a network in the clear.
+// Preserve the scheme the user chose for the Coddy server.
 export function serverURL(address) {
   const url = new URL(String(address || "").trim());
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash)
     throw new Error("Enter an HTTP(S) server address without credentials or query");
-  if (url.protocol === "http:" && !loopback.includes(url.hostname))
-    throw new Error("Use HTTPS for a Coddy server on another machine");
   if (url.pathname !== "/") throw new Error("Enter the server address without a path");
   return url.origin;
 }

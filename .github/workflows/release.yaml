@@ -103,7 +103,7 @@ jobs:
             gh release upload "$TAG" dist/coddy-for-browser-*.zip --clobber
           else
             gh release create "$TAG" dist/coddy-for-browser-*.zip --verify-tag \
-              --title "Coddy for Browser $TAG" --notes-file notes.md
+              --title "$TAG" --notes-file notes.md
           fi
 
   chrome-web-store:

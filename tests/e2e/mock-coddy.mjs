@@ -148,7 +148,7 @@ class Socket {
 
 // startMockCoddy serves the listener on a free loopback port. It records what
 // the extension sent and lets a test send commands.
-export async function startMockCoddy({ key }) {
+export async function startMockCoddy({ key, hostname = "127.0.0.1" }) {
   const state = {
     socket: null,
     tabs: [],
@@ -322,7 +322,7 @@ export async function startMockCoddy({ key }) {
   // CODDY_MOCK_PORT pins the port, for screenshots that show the default
   // address of the server.
   await new Promise((r) => server.listen(Number(process.env.CODDY_MOCK_PORT) || 0, "127.0.0.1", r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const base = `http://${hostname}:${server.address().port}`;
   api = {
     base,
     state,

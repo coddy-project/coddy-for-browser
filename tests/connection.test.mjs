@@ -45,11 +45,11 @@ function connection(over = {}) {
 
 test("initialize goes first with the key, the browser, its actions and its grant", async () => {
   let ready = false;
-  const { c } = connection({ opts: { onReady: () => (ready = true) } });
+  const { c } = connection({ address: "http://10.0.0.5:12348", opts: { onReady: () => (ready = true) } });
   c.connect();
   await tick();
   const ws = FakeSocket.last;
-  assert.equal(ws.url, "ws://127.0.0.1:12348/browser/v1/connect");
+  assert.equal(ws.url, "ws://10.0.0.5:12348/browser/v1/connect");
   const [hello] = ws.sent;
   assert.equal(hello.method, "initialize");
   assert.deepEqual(hello.params, {
@@ -113,11 +113,11 @@ test("handlers registered in setup answer Coddy's requests", async () => {
 });
 
 test("an invalid address or a missing key never dials", () => {
-  const { c } = connection({ address: "http://10.0.0.5:12348" });
+  const { c } = connection({ address: "http://10.0.0.5:12348/path" });
   FakeSocket.last = null;
   c.connect();
   assert.equal(FakeSocket.last, null);
-  assert.match(c.status, /HTTPS/);
+  assert.match(c.status, /path/);
   const { c: noKey } = connection({ key: "" });
   noKey.connect();
   assert.equal(FakeSocket.last, null);

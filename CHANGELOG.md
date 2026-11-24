@@ -4,6 +4,11 @@ Every version that reaches people has a section here, under its number: the rele
 changed" and addons.mozilla.org as the version's release notes. A pull request that changes the extension adds its
 lines under the version it raises `package.json` to.
 
+## 0.1.6
+
+- You can connect to a Coddy server over HTTP on a trusted LAN. Use HTTPS on untrusted networks to protect the
+  extension key and tab data.
+
 ## 0.1.5
 
 - The settings page has a **Side panel** card with **Show the chat of the active tab**, off by default. With it on,
