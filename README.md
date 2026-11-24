@@ -82,8 +82,8 @@ the web UI and the questions about websites open in tabs.
    ```
 
    Generate the key, at least 32 characters, with `openssl rand -hex 32` and keep it in `<home>/.env` as
-   `CODDY_BROWSER_KEY`. Run `coddy serve` on the machine of the browser. A server on another machine needs HTTPS: the
-   extension uses plain HTTP only for `localhost`, `127.0.0.1` and `[::1]`.
+   `CODDY_BROWSER_KEY`. Run `coddy serve` on the machine of the browser or connect to a server on another machine.
+   Use HTTPS outside a trusted LAN: HTTP sends the key and data in plaintext.
 2. **[Install](#install) the extension** from the store for your browser.
 3. **[Connect](#connect).** On the settings page that opens after the install, enter the address of the server's web
    UI (`http://127.0.0.1:12345` for a local server), the key and a name for this browser, and press **Save and
@@ -258,12 +258,14 @@ Let Termux run unrestricted in Android's battery settings, or Android stops the 
 </details>
 
 <details>
-<summary><b>Coddy on another machine</b>, behind HTTPS</summary>
+<summary><b>Coddy on another machine</b>, over the network</summary>
 
-A `coddy serve` on a laptop or a server drives the phone's browser over the network. The extension takes plain HTTP
-only for the phone's own loopback, so the server needs HTTPS: `coddy serve` has no TLS of its own, and a
-TLS-terminating proxy (Caddy, nginx) in front of its HTTP server gives it one. Enter the proxy's address, such as
-`https://coddy.example.com`, and the server's `browser.token` on the settings page.
+A `coddy serve` on a laptop or a server drives the phone's browser over the network. In a trusted LAN, enter the
+server's address, for example `http://192.168.1.10:12345`, and its `browser.token` on the settings page. HTTP sends
+the key and data in plaintext, so anyone who can observe the connection can read them.
+
+Outside a trusted LAN, use HTTPS. `coddy serve` has no TLS of its own; put a TLS-terminating proxy (Caddy, nginx)
+in front of its HTTP server and enter the proxy's address, such as `https://coddy.example.com`.
 
 A certificate of a public authority works as it is. One of your own certificate authority needs two steps on the
 phone: install the authority's certificate in Android as a CA certificate (under **Encryption and credentials** in the
@@ -537,10 +539,6 @@ versions of the protocol. Update the older of the two.
 **The status stays amber, "Disconnected; retrying in N s".** The extension cannot reach the server. Check that
 `coddy serve` runs, that the address is the one of its web UI, and that the server printed a `browser` line with
 `/browser/v1/connect` at start: without it, `browser.enable` is off in the configuration the server reads.
-
-**Saving the address answers "Use HTTPS for a Coddy server on another machine".** The extension uses plain HTTP only
-for this machine. Put a TLS-terminating proxy in front of the server's HTTP server, as for
-[a phone](#a-phone-with-firefox-for-android).
 
 **Chrome shows a bar that Coddy for Browser started debugging the browser.** This is how Chrome marks the debugger the
 extension clicks and types through. The bar goes away 20 s after the last action.

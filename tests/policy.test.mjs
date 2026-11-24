@@ -9,12 +9,22 @@ test("a website is its origin, scheme and port included", () => {
     assert.throws(() => siteOf(bad));
 });
 
-test("plain HTTP reaches only a server on this machine", () => {
+test("an HTTP server on the LAN uses the configured origin for connections and files", () => {
+  const ticket = "a".repeat(48);
+  for (const host of ["192.168.1.5:12348", "coddy.lan:12348", "[fd00::5]:12348"]) {
+    assert.equal(serverURL(` http://${host}/ `), `http://${host}`);
+    assert.equal(socketURL(`http://${host}`), `ws://${host}/browser/v1/connect`);
+    assert.equal(fileURL(`http://${host}`, ticket), `http://${host}/browser/v1/files/${ticket}`);
+  }
+});
+
+test("the configured server must be an HTTP(S) origin", () => {
   assert.equal(serverURL("http://127.0.0.1:12348"), "http://127.0.0.1:12348");
   assert.equal(serverURL(" http://localhost:12348/ "), "http://localhost:12348");
   assert.equal(serverURL("http://[::1]:12348"), "http://[::1]:12348");
   assert.equal(serverURL("https://coddy.example.org"), "https://coddy.example.org");
-  assert.throws(() => serverURL("http://192.168.1.5:12348"), /HTTPS/);
+  assert.throws(() => serverURL("http://coddy.lan?key=test"));
+  assert.throws(() => serverURL("http://coddy.lan#test"));
   assert.throws(() => serverURL("https://coddy.example.org/browser"), /path/);
   assert.throws(() => serverURL("https://u:p@coddy.example.org"), /credentials/);
   assert.throws(() => serverURL("ws://127.0.0.1:12348"));

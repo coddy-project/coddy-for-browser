@@ -21,7 +21,8 @@ export function pageAction(action, params) {
 
   if (action === "snapshot") {
     state.refs.clear();
-    state.nonce = crypto.randomUUID().slice(0, 8);
+    // getRandomValues is available on plain HTTP pages too.
+    state.nonce = crypto.getRandomValues(new Uint32Array(1))[0].toString(16).padStart(8, "0");
     const items = [];
     const selector =
       'a[href],button,input,textarea,select,summary,[role],[contenteditable=""],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';

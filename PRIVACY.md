@@ -1,6 +1,6 @@
 # Privacy policy of Coddy for Browser
 
-Last updated: 30 October 2026.
+Last updated: 24 November 2026.
 
 Coddy for Browser is a browser extension that connects your browser to a Coddy agent server you run yourself
 (`coddy serve`). This policy describes what the extension handles and where it goes.
@@ -18,6 +18,9 @@ To that server it sends:
   elements, screenshots of the visible part of the tab, the files a chat uploads to or downloads from the page, and the
   outcome of each action;
 - the name you give this browser and the version of the extension.
+
+An HTTP connection sends the server key and this data in plaintext, so anyone who can observe the connection can read
+them. Use HTTPS outside a trusted LAN.
 
 What happens to this data next is decided by your Coddy server: it passes page contents to the model provider it is
 configured with, like any other tool result. Your Coddy's configuration and its provider's terms apply there.

@@ -23,8 +23,9 @@
         <form id="connect">
           <label
             >Server address
-            <input id="address" type="url" placeholder="http://127.0.0.1:12345" required spellcheck="false" />
+            <input id="address" type="url" aria-describedby="address-note" placeholder="http://127.0.0.1:12345" required spellcheck="false" />
           </label>
+          <p id="address-note" class="muted">HTTP sends the extension key and tab data without encryption. Use HTTPS outside a trusted network.</p>
           <label
             >Extension key
             <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="browser.token of the server" />

@@ -77,7 +77,9 @@ function firefoxPath() {
   throw new Error("No firefox on PATH; set CODDY_FIREFOX_PATH");
 }
 
-const coddy = await startMockCoddy({ key });
+// Test a LAN-style HTTP origin without exposing the mock to the network.
+const hostname = "coddy.test";
+const coddy = await startMockCoddy({ key, hostname });
 const browser = await puppeteer.launch({
   browser: "firefox",
   executablePath: firefoxPath(),
@@ -89,6 +91,8 @@ const browser = await puppeteer.launch({
   args: ["-remote-allow-system-access"],
   env: { ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1" },
   extraPrefsFirefox: {
+    "network.dns.localDomains": hostname,
+    "network.proxy.type": 0,
     "extensions.webextensions.uuids": JSON.stringify({ [GECKO_ID]: uuid }),
     "intl.locale.requested": "en-US",
   },
