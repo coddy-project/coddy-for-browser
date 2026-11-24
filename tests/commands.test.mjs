@@ -110,13 +110,25 @@ test("clicks by ref go through the element's centre as trusted input", async () 
   assert.deepEqual([wheel[2].x, wheel[2].y, wheel[2].deltaY], [400, 300, 300]);
 });
 
-test("a screenshot is taken at one image pixel per CSS pixel with the indicator hidden", async () => {
+test("a compressed screenshot is taken at one image pixel per CSS pixel with the indicator hidden", async () => {
   const { api, groups, commands, dbg } = await setup();
   const tab = await groups.open("https://example.com/", chat);
   const result = await commands.handle(cmd("screenshot", tab.id));
-  assert.match(result.dataUrl, /^data:image\/png;base64,/);
+  assert.match(result.dataUrl, /^data:image\/jpeg;base64,/);
   const shot = dbg.sent.find(([, m]) => m === "Page.captureScreenshot");
+  assert.equal(shot[2].format, "jpeg");
+  assert.equal(shot[2].quality, 80);
   assert.equal(shot[2].clip.scale, 0.5);
+  const marks = api.calls.filter((c) => c[0] === "executeScript" && c[2] === "indicator").map((c) => c[3]);
+  assert.deepEqual(marks.slice(-2), [false, true]);
+});
+
+test("an oversized screenshot is refused before it can exceed the WebSocket limit", async () => {
+  const { api, groups, commands } = await setup();
+  const tab = await groups.open("https://example.com/", chat);
+  commands.input.screenshot = async () => ({ dataUrl: `data:image/jpeg;base64,${"A".repeat(6 * 1024 * 1024)}` });
+
+  await assert.rejects(commands.handle(cmd("screenshot", tab.id)), (e) => e.reason === "too_large");
   const marks = api.calls.filter((c) => c[0] === "executeScript" && c[2] === "indicator").map((c) => c[3]);
   assert.deepEqual(marks.slice(-2), [false, true]);
 });
@@ -222,7 +234,7 @@ test("input aimed at a frame of another website is refused", async () => {
 test("without the debugger, input and screenshots go through the page", async () => {
   const { api, groups, commands } = await setup();
   const captured = [];
-  api.tabs.captureTab = async (tabId, opts) => (captured.push([tabId, opts]), "data:image/png;base64,iVBORw0KGgo=");
+  api.tabs.captureTab = async (tabId, opts) => (captured.push([tabId, opts]), "data:image/jpeg;base64,/9j/4AAQSkZJRg==");
   commands.input = pageInput(api, (tabId, action, params) => commands.script(tabId, action, params));
   api.scripting.results["pageAction:input"] = (p) => ({ ok: true, trusted: false, kind: p.kind, origin: p.expected_origin });
   // The page is 800 CSS pixels wide in a tab 400 pixels wide: laid out wider
@@ -234,8 +246,8 @@ test("without the debugger, input and screenshots go through the page", async ()
   assert.equal(clicked.trusted, false);
   assert.equal(clicked.origin, "https://example.com");
   const shot = await commands.handle(cmd("screenshot", tab.id));
-  assert.match(shot.dataUrl, /^data:image\/png;base64,/);
-  assert.deepEqual(captured, [[tab.id, { format: "png", scale: 2 }]]);
+  assert.match(shot.dataUrl, /^data:image\/jpeg;base64,/);
+  assert.deepEqual(captured, [[tab.id, { format: "jpeg", quality: 80, scale: 2 }]]);
 });
 
 test("release takes the working marks off the tabs it hands back", async () => {

@@ -26,6 +26,8 @@ export const ACTIONS = [
 ];
 
 export const MAX_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_SCREENSHOT_BYTES = 4 * 1024 * 1024;
+const MAX_SCREENSHOT_BASE64_CHARS = 4 * Math.ceil(MAX_SCREENSHOT_BYTES / 3);
 
 // chatOf reads the chat a command is for. A chat of another Coddy process
 // names its node; the side panel shows the node next to the chat's title
@@ -262,6 +264,9 @@ export class Commands {
         await this.mark(tab.id, false, session);
         try {
           result = await this.input.screenshot(tab.id, view, expected);
+          const separator = typeof result?.dataUrl === "string" ? result.dataUrl.indexOf(",") : -1;
+          if (separator < 0 || result.dataUrl.length - separator - 1 > MAX_SCREENSHOT_BASE64_CHARS)
+            throw failure("too_large", "Screenshot exceeds 4 MiB; reduce the page size and try again");
         } finally {
           await this.mark(tab.id, true, session);
         }

@@ -179,10 +179,15 @@ try {
   await page.waitForFunction(() => document.querySelector("#hover").textContent === "hovered");
 
   const picture = await coddy.command("screenshot", tab);
-  assert.match(picture.dataUrl, /^data:image\/png;base64,/);
-  const png = Buffer.from(picture.dataUrl.split(",")[1], "base64");
+  assert.match(picture.dataUrl, /^data:image\/jpeg;base64,/);
   const viewport = await page.evaluate(() => [innerWidth, innerHeight]);
-  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], viewport, "one image pixel per CSS pixel");
+  const dimensions = await page.evaluate(async (dataUrl) => {
+    const image = new Image();
+    image.src = dataUrl;
+    await image.decode();
+    return [image.naturalWidth, image.naturalHeight];
+  }, picture.dataUrl);
+  assert.deepEqual(dimensions, viewport, "one image pixel per CSS pixel");
 
   const up = coddy.stage(Buffer.from("upload fixture"), true);
   await coddy.command("upload_file", { ...tab, params: { ref: ref("Upload"), transfer_id: up, filename: "example.txt" } });
