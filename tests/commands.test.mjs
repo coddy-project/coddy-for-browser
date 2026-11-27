@@ -123,12 +123,13 @@ test("a compressed screenshot is taken at one image pixel per CSS pixel with the
   assert.deepEqual(marks.slice(-2), [false, true]);
 });
 
-test("an oversized screenshot is refused before it can exceed the WebSocket limit", async () => {
+test("a screenshot of any size is passed through", async () => {
   const { api, groups, commands } = await setup();
   const tab = await groups.open("https://example.com/", chat);
   commands.input.screenshot = async () => ({ dataUrl: `data:image/jpeg;base64,${"A".repeat(6 * 1024 * 1024)}` });
 
-  await assert.rejects(commands.handle(cmd("screenshot", tab.id)), (e) => e.reason === "too_large");
+  const result = await commands.handle(cmd("screenshot", tab.id));
+  assert.ok(result.dataUrl.length > 6 * 1024 * 1024);
   const marks = api.calls.filter((c) => c[0] === "executeScript" && c[2] === "indicator").map((c) => c[3]);
   assert.deepEqual(marks.slice(-2), [false, true]);
 });
