@@ -9,14 +9,14 @@ lines under the version it raises `package.json` to.
 - Screenshots are no longer bounded in size: a large or zoomed-out page is captured whole instead of failing with a
   size error. Needs a Coddy server that accepts large frames (coddy-agent #788).
 
+## 0.1.7
+
+- The extension sends JPEG screenshots up to 4 MiB and reports a size error for larger images.
+
 ## 0.1.6
 
 - You can connect to a Coddy server over HTTP on a trusted LAN. Use HTTPS on untrusted networks to protect the
   extension key and tab data.
-
-## 0.1.7
-
-- The extension sends JPEG screenshots up to 4 MiB and reports a size error for larger images.
 
 ## 0.1.5
 
